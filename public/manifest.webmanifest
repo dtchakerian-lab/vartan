@@ -1,0 +1,11 @@
+{
+  "name": "Vartan Music Visualizer",
+  "short_name": "Vartan",
+  "description": "Drop a song, watch it become living visuals. Free, private, on-device.",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#07070f",
+  "theme_color": "#07070f",
+  "icons": []
+}

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#07070f" />
+  <meta name="description" content="Vartan — drop a song, watch it become living visuals. Free, private, works offline." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>Vartan — Music Visualizer</title>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <!-- Top bar -->
+  <header id="topbar" class="ui-layer">
+    <div class="brand">VARTAN</div>
+    <div id="track-title" class="track-title"></div>
+    <button id="btn-fullscreen" class="icon-btn" title="Fullscreen (F)" aria-label="Fullscreen">⛶</button>
+  </header>
+
+  <!-- Hero / input panel -->
+  <section id="hero" class="ui-layer">
+    <h1>Drop a song.<br />Watch it come alive.</h1>
+    <p class="sub">Live visuals built from the music itself — bass, tempo, energy. Nothing uploaded, everything stays on this device.</p>
+    <div id="dropzone" role="button" tabindex="0">
+      <span class="dz-icon">♫</span>
+      <span class="dz-text">Drop an audio file<br /><em>or click to browse</em></span>
+    </div>
+    <div class="hero-actions">
+      <button id="btn-mic" class="pill-btn">Use microphone</button>
+      <button id="btn-demo" class="pill-btn">Try demo beat</button>
+    </div>
+    <p id="hero-hint" class="hint"></p>
+  </section>
+
+  <!-- Tap-to-start overlay (audio unlock) -->
+  <div id="unlock-overlay" class="hidden">
+    <button id="btn-unlock">Tap to start</button>
+  </div>
+
+  <!-- Analyzing indicator -->
+  <div id="analyzing" class="hidden"><div class="bar"></div><span>Reading the music…</span></div>
+
+  <!-- Bottom controls -->
+  <footer id="controls" class="ui-layer hidden">
+    <div class="world-row">
+      <div id="world-chips" class="chips"></div>
+      <label class="auto-toggle" title="Pick a style automatically from the song's fingerprint">
+        <input type="checkbox" id="chk-auto" checked />
+        <span>Auto&#8209;match</span>
+      </label>
+    </div>
+    <div class="action-row">
+      <button id="btn-play" class="icon-btn big" title="Play / pause (Space)">▶</button>
+      <span id="time-label" class="time"></span>
+      <span class="spacer"></span>
+      <button id="btn-snapshot" class="icon-btn" title="Save frame (S)">📷</button>
+      <button id="btn-record" class="icon-btn" title="Record clip (30s max)"><span class="rec-dot"></span></button>
+      <span id="rec-label" class="time"></span>
+      <span class="spacer"></span>
+      <button id="btn-eject" class="icon-btn" title="Load another track">✕</button>
+    </div>
+  </footer>
+
+  <div id="toast" class="hidden"></div>
+
+  <input type="file" id="file-input" accept="audio/*,image/*" hidden />
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
