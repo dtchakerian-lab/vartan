@@ -134,15 +134,20 @@ export class AudioDynamics {
     this.sHue += (hueTarget - this.sHue) * (Math.abs(hueTarget - this.sHue) > 0.02 ? hUp : hDown);
 
     // Section change: fast energy diverging from a ~10s baseline means the
-    // song shifted gears (chorus arrival, breakdown, drop). Fire a slow-decay
-    // pulse and jolt the palette to a new region of the wheel.
+    // song shifted gears (chorus arrival, breakdown, drop). Pulse strength is
+    // proportional to the size of the shift so visuals track the song's flow —
+    // small lifts get small washes, big drops get the full blast.
     this.timeAcc += dt;
-    this.slowEnergy += (this.sEnergy - this.slowEnergy) * (1 - Math.exp(-dt * 0.1));
+    this.slowEnergy += (this.sEnergy - this.slowEnergy) * (1 - Math.exp(-dt * 0.12));
     const deviation = this.sEnergy - this.slowEnergy;
-    if (Math.abs(deviation) > 0.15 && this.timeAcc - this.lastSectionAt > 5) {
-      this.sectionEnv = 1;
-      this.lastSectionAt = this.timeAcc;
-      this.hueJolt += deviation > 0 ? 0.11 : -0.07;
+    const mag = Math.abs(deviation);
+    if (mag > 0.09 && this.timeAcc - this.lastSectionAt > 2.5) {
+      const strength = Math.min(1, mag * 4.5);
+      if (strength > this.sectionEnv) {
+        this.sectionEnv = strength;
+        this.lastSectionAt = this.timeAcc;
+        this.hueJolt += (deviation > 0 ? 0.11 : -0.07) * strength;
+      }
     }
     this.sectionEnv *= Math.exp(-dt * 0.9);
     if (this.sectionEnv < 0.001) this.sectionEnv = 0;
