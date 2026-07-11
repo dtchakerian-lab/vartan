@@ -10,7 +10,9 @@ export interface LiveDynamics {
   trebleHit: number;
   /** Rolling loudness 0..1 — verse quiet, chorus loud. */
   liveEnergy: number;
-  /** -0.2..0.2 hue offset from where energy sits in the spectrum. */
+  /** Spikes to 1 when the song changes sections (chorus hits, breakdown), slow decay. */
+  sectionPulse: number;
+  /** Hue offset: spectral tilt + slow drift through the wheel + section jolts. */
   hueShift: number;
   /** Motion multiplier 0.35..2.8 derived from live energy + hits. */
   liveSpeed: number;
@@ -71,6 +73,13 @@ export class AudioDynamics {
   private sWarmth = 0.5;
   private sHue = 0;
 
+  private slowEnergy = 0;
+  private sectionEnv = 0;
+  private timeAcc = 0;
+  private lastSectionAt = -10;
+  private hueDrift = 0;
+  private hueJolt = 0;
+
   reset(): void {
     this.agcBass.reset();
     this.agcMid.reset();
@@ -82,6 +91,12 @@ export class AudioDynamics {
     this.sEnergy = 0;
     this.sWarmth = 0.5;
     this.sHue = 0;
+    this.slowEnergy = 0;
+    this.sectionEnv = 0;
+    this.timeAcc = 0;
+    this.lastSectionAt = -10;
+    this.hueDrift = 0;
+    this.hueJolt = 0;
   }
 
   update(
@@ -118,8 +133,29 @@ export class AudioDynamics {
     const hueTarget = (centroid - 0.5) * 0.38 + (trebleHit - bassHit) * 0.12;
     this.sHue += (hueTarget - this.sHue) * (Math.abs(hueTarget - this.sHue) > 0.02 ? hUp : hDown);
 
+    // Section change: fast energy diverging from a ~10s baseline means the
+    // song shifted gears (chorus arrival, breakdown, drop). Fire a slow-decay
+    // pulse and jolt the palette to a new region of the wheel.
+    this.timeAcc += dt;
+    this.slowEnergy += (this.sEnergy - this.slowEnergy) * (1 - Math.exp(-dt * 0.1));
+    const deviation = this.sEnergy - this.slowEnergy;
+    if (Math.abs(deviation) > 0.15 && this.timeAcc - this.lastSectionAt > 5) {
+      this.sectionEnv = 1;
+      this.lastSectionAt = this.timeAcc;
+      this.hueJolt += deviation > 0 ? 0.11 : -0.07;
+    }
+    this.sectionEnv *= Math.exp(-dt * 0.9);
+    if (this.sectionEnv < 0.001) this.sectionEnv = 0;
+
+    // Continuous hue travel — faster when the music is loud, ~2 min per lap.
+    this.hueDrift += dt * 0.006 * (0.35 + this.sEnergy);
+
     const hitBoost = bassHit * 0.55 + midHit * 0.35 + trebleHit * 0.25;
-    const liveSpeed = clampRange(0.32 + this.sEnergy * 2.1 + hitBoost * 1.4, 0.32, 2.85);
+    const liveSpeed = clampRange(
+      0.32 + this.sEnergy * 2.1 + hitBoost * 1.4 + this.sectionEnv * 0.5,
+      0.32,
+      3.1,
+    );
 
     return {
       bass,
@@ -130,7 +166,8 @@ export class AudioDynamics {
       midHit,
       trebleHit,
       liveEnergy: this.sEnergy,
-      hueShift: this.sHue,
+      sectionPulse: this.sectionEnv,
+      hueShift: this.sHue + this.hueDrift + this.hueJolt,
       liveSpeed,
       warmth: this.sWarmth,
     };

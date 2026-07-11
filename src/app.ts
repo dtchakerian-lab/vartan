@@ -476,6 +476,7 @@ export class App {
       midHit: live.midHit,
       trebleHit: live.trebleHit,
       liveEnergy: live.liveEnergy,
+      sectionPulse: live.sectionPulse,
       liveSpeed: live.liveSpeed,
       energy: this.fingerprint.energy,
       brightness: this.fingerprint.brightness,

@@ -49,7 +49,7 @@ void main() {
 
   // Beat flash down the tunnel core.
   col += uColorC * pow(1.0 - r, 5.0) * (uBeat * 2.0 + uMidHit * 1.2);
-  col *= 0.85 + uLiveEnergy * 0.45 + uTrebleHit * 0.25;
+  col *= 0.85 + uLiveEnergy * 0.45 + uTrebleHit * 0.25 + uSectionPulse * 0.4;
 
   gl_FragColor = vec4(col, 1.0);
 }

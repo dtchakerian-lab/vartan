@@ -32,6 +32,7 @@ uniform float uLiveEnergy;
 uniform float uBassHit;
 uniform float uMidHit;
 uniform float uTrebleHit;
+uniform float uSectionPulse;
 uniform float uLiveSpeed;
 uniform vec3 uColorA;
 uniform vec3 uColorB;
@@ -54,9 +55,11 @@ void main() {
   col += uColorC * (spec * 0.45 + uTreble * 0.55 + uTrebleHit * 0.9);
   col *= 0.55 + uLiveEnergy * 0.75 + uBass * 0.45 + uBeat * 0.55;
 
-  // Hit flashes wash the sky.
+  // Hit flashes wash the sky; section changes light the whole horizon.
   col += uColorC * uMidHit * 0.35 * smoothstep(0.7, 0.0, length(p));
   col += uColorA * uBassHit * 0.28;
+  col += (uColorC * 0.6 + uColorA * 0.4) * uSectionPulse * 0.45 * smoothstep(1.2, 0.0, length(p));
+  col *= 1.0 + uSectionPulse * 0.3;
 
   float stars = step(0.9982, hash21(floor(p * 180.0))) * (0.25 + uTreble + uTrebleHit);
   col += stars * (1.0 - band) * 0.9;
@@ -160,6 +163,7 @@ export class FlowWorld extends VisualWorld {
         uBassHit: { value: 0 },
         uMidHit: { value: 0 },
         uTrebleHit: { value: 0 },
+        uSectionPulse: { value: 0 },
         uLiveSpeed: { value: 1 },
         uColorA: { value: new THREE.Color() },
         uColorB: { value: new THREE.Color() },
@@ -212,16 +216,17 @@ export class FlowWorld extends VisualWorld {
     this.skyUniforms.uBassHit.value = p.bassHit;
     this.skyUniforms.uMidHit.value = p.midHit;
     this.skyUniforms.uTrebleHit.value = p.trebleHit;
+    this.skyUniforms.uSectionPulse.value = p.sectionPulse;
     this.skyUniforms.uLiveSpeed.value = p.liveSpeed;
     (this.skyUniforms.uColorA.value as THREE.Color).copy(p.colorA);
     (this.skyUniforms.uColorB.value as THREE.Color).copy(p.colorB);
     (this.skyUniforms.uColorC.value as THREE.Color).copy(p.colorC);
     this.skyUniforms.uSpectrum.value = ctx.spectrumTex;
 
-    const hit = p.bassHit * 0.7 + p.midHit * 0.45 + p.beat * 0.5;
+    const hit = p.bassHit * 0.7 + p.midHit * 0.45 + p.beat * 0.5 + p.sectionPulse * 0.4;
     this.shake += (hit - this.shake) * Math.min(1, p.dt * 18);
     const t = p.time * 0.04 * p.liveSpeed;
-    const dist = 7.2 - p.bass * 1.4 - p.liveEnergy * 0.6 + this.shake * 0.35;
+    const dist = 7.2 - p.bass * 1.4 - p.liveEnergy * 0.6 - p.sectionPulse * 0.9 + this.shake * 0.35;
     this.camera.position.set(
       Math.sin(t) * 0.35 + this.shake * 0.08 * Math.sin(p.time * 40),
       1.0 + p.mid * 0.35 + this.shake * 0.06,

@@ -41,6 +41,7 @@ uniform float uBassHit;
 uniform float uMidHit;
 uniform float uTrebleHit;
 uniform float uLiveEnergy;
+uniform float uSectionPulse;
 uniform float uLiveSpeed;
 uniform float uEnergy;
 uniform float uSpeed;

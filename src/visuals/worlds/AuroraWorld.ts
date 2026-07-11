@@ -32,8 +32,8 @@ void main() {
   vec3 col = mix(uColorB * 0.35, uColorA, band);
   col += uColorC * band * band * (0.45 + uTreble * 1.4 + uTrebleHit * 1.2);
 
-  // Bass bloom + hit flashes.
-  col *= 0.7 + uLiveEnergy * 0.65 + uBass * 0.75 + uBeat * 0.55;
+  // Bass bloom + hit flashes; section changes surge the whole sky.
+  col *= 0.7 + uLiveEnergy * 0.65 + uBass * 0.75 + uBeat * 0.55 + uSectionPulse * 0.4;
   col += uColorC * uMidHit * 0.35;
   col += uColorA * uBassHit * 0.28;
 

@@ -44,7 +44,7 @@ void main() {
   col = mix(col, uColorC, spec * spec * 1.8);
   col += uColorC * pow(1.0 - r, 3.0) * (uBass * 1.4 + uBeat * 0.9 + uMidHit * 0.7);
   col += uColorA * uTrebleHit * 0.35;
-  col *= 0.65 + uLiveEnergy * 0.55 + n * 0.5;
+  col *= 0.65 + uLiveEnergy * 0.55 + n * 0.5 + uSectionPulse * 0.35;
 
   // Center glow + edge fade.
   col *= smoothstep(1.15, 0.35, r);
