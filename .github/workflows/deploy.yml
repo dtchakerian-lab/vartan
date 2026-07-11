@@ -38,3 +38,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
+          # Project site URL is /vartan/ — keep built files at gh-pages root.
+          # User must set Settings → Pages → Deploy from branch → gh-pages / (root).

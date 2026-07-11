@@ -216,12 +216,12 @@ can be swapped in behind `analyzeBuffer()` without touching anything else.
 
 ## 12. Build & deploy
 
-- `npm run dev` → Vite dev server at `/vartan/`
+- `npm run dev` → Vite dev server at `http://localhost:5173/`
 - `npm run build` → `tsc` typecheck + Vite build to `dist/`
 - Deploy: push to `main` → `.github/workflows/deploy.yml` builds and
   publishes to GitHub Pages (Settings → Pages → Source: **GitHub Actions**).
 - URL: `https://<username>.github.io/vartan/`
-- `vite.config.ts` `base: '/vartan/'` must match the repo name.
+- `vite.config.ts` uses `base: './'` (relative asset paths for GitHub Pages project sites).
 
 ## 13. Testing checklist (run before sharing the link)
 
