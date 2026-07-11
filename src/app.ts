@@ -458,17 +458,19 @@ export class App {
       treble = Math.max(treble, micLvl * 0.35);
     }
 
-    const beat = this.detector.update(bass, mid, treble, volume, time, dt);
-    const live = this.dynamics.update(bass, mid, treble, volume, frame.spectrum, beat, dt);
+    // AGC-normalize bands against the recent mix, then beat-detect on those
+    // (relative signals make hits obvious even in a dense wall of sound).
+    const live = this.dynamics.update(bass, mid, treble, volume, frame.spectrum, dt);
+    const beat = this.detector.update(live.bass, live.mid, live.treble, live.volume, time, dt);
     const colors = deriveLiveColors(this.style, live);
 
     const params: VisualParams = {
       time,
       dt,
-      bass,
-      mid,
-      treble,
-      volume,
+      bass: live.bass,
+      mid: live.mid,
+      treble: live.treble,
+      volume: live.volume,
       beat,
       bassHit: live.bassHit,
       midHit: live.midHit,

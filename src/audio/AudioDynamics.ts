@@ -1,5 +1,10 @@
-/** Per-frame live dynamics: transients, loudness envelope, spectral tilt. */
+/** Per-frame live dynamics: AGC-normalized bands, transients, loudness, tilt. */
 export interface LiveDynamics {
+  /** Bands renormalized against the last few seconds of the mix (0..1). */
+  bass: number;
+  mid: number;
+  treble: number;
+  volume: number;
   bassHit: number;
   midHit: number;
   trebleHit: number;
@@ -14,10 +19,51 @@ export interface LiveDynamics {
 }
 
 /**
+ * Adaptive gain per band: tracks a rolling floor/ceiling so a dense mix
+ * (where raw levels sit pinned high) still produces full-range motion.
+ * A kick reads relative to the last few seconds, not an absolute scale.
+ */
+class BandAgc {
+  private floor = 0;
+  private ceil = 0.3;
+
+  normalize(v: number, dt: number): number {
+    // Floor climbs slowly toward sustained loudness, falls quickly on drops.
+    const fRise = 1 - Math.exp(-dt * 0.3);
+    const fFall = 1 - Math.exp(-dt * 2.2);
+    this.floor += (v - this.floor) * (v > this.floor ? fRise : fFall);
+
+    // Ceiling grabs peaks fast, decays slowly so headroom stays realistic.
+    const cRise = 1 - Math.exp(-dt * 8);
+    const cFall = 1 - Math.exp(-dt * 0.25);
+    this.ceil += (v - this.ceil) * (v > this.ceil ? cRise : cFall);
+
+    this.floor = Math.min(this.floor, v);
+    this.ceil = Math.max(this.ceil, this.floor + 0.07, 0.05);
+
+    const n = clamp01((v - this.floor) / (this.ceil - this.floor));
+    // Blend in some absolute level so silence stays dark and quiet parts stay calm,
+    // then a contrast curve to separate mid-levels.
+    const blended = n * 0.72 + clamp01(v * 1.5) * 0.28;
+    return blended * blended * (3 - 2 * blended);
+  }
+
+  reset(): void {
+    this.floor = 0;
+    this.ceil = 0.3;
+  }
+}
+
+/**
  * Tracks transients and section-level energy so visuals can punch on hits
  * and breathe on slow swells — not just follow smoothed band levels.
  */
 export class AudioDynamics {
+  private agcBass = new BandAgc();
+  private agcMid = new BandAgc();
+  private agcTreble = new BandAgc();
+  private agcVolume = new BandAgc();
+
   private prevBass = 0;
   private prevMid = 0;
   private prevTreble = 0;
@@ -26,6 +72,10 @@ export class AudioDynamics {
   private sHue = 0;
 
   reset(): void {
+    this.agcBass.reset();
+    this.agcMid.reset();
+    this.agcTreble.reset();
+    this.agcVolume.reset();
     this.prevBass = 0;
     this.prevMid = 0;
     this.prevTreble = 0;
@@ -35,23 +85,27 @@ export class AudioDynamics {
   }
 
   update(
-    bass: number,
-    mid: number,
-    treble: number,
-    volume: number,
+    rawBass: number,
+    rawMid: number,
+    rawTreble: number,
+    rawVolume: number,
     spectrum: Uint8Array,
-    beat: number,
     dt: number,
   ): LiveDynamics {
-    const bassHit = clamp01(Math.max(0, bass - this.prevBass * 0.55) * 4.2 + beat * 0.35);
-    const midHit = clamp01(Math.max(0, mid - this.prevMid * 0.5) * 4.8);
-    const trebleHit = clamp01(Math.max(0, treble - this.prevTreble * 0.45) * 5.5);
+    const bass = this.agcBass.normalize(rawBass, dt);
+    const mid = this.agcMid.normalize(rawMid, dt);
+    const treble = this.agcTreble.normalize(rawTreble, dt);
+    const volume = this.agcVolume.normalize(rawVolume, dt);
+
+    const bassHit = clamp01(Math.max(0, bass - this.prevBass * 0.6) * 3.6);
+    const midHit = clamp01(Math.max(0, mid - this.prevMid * 0.55) * 4.0);
+    const trebleHit = clamp01(Math.max(0, treble - this.prevTreble * 0.5) * 4.5);
 
     this.prevBass = bass;
     this.prevMid = mid;
     this.prevTreble = treble;
 
-    const targetEnergy = clamp01(volume * 1.15 + bassHit * 0.25 + midHit * 0.15);
+    const targetEnergy = clamp01(volume * 1.05 + bassHit * 0.25 + midHit * 0.15);
     const eUp = 1 - Math.exp(-dt * 22);
     const eDown = 1 - Math.exp(-dt * 4.5);
     this.sEnergy += (targetEnergy - this.sEnergy) * (targetEnergy > this.sEnergy ? eUp : eDown);
@@ -68,6 +122,10 @@ export class AudioDynamics {
     const liveSpeed = clampRange(0.32 + this.sEnergy * 2.1 + hitBoost * 1.4, 0.32, 2.85);
 
     return {
+      bass,
+      mid,
+      treble,
+      volume,
       bassHit,
       midHit,
       trebleHit,
