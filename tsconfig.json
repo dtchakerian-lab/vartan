@@ -8,8 +8,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "useDefineForClassFields": true,
-    "types": ["vite/client"]
+    "useDefineForClassFields": true
   },
   "include": ["src"]
 }
