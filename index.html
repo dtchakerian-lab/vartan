@@ -7,8 +7,8 @@
   <meta name="description" content="Vartan — drop a song, watch it become living visuals. Free, private, works offline." />
   <link rel="manifest" href="manifest.webmanifest" />
   <title>Vartan — Music Visualizer</title>
-  <script type="module" crossorigin src="./assets/index-CKk6Zt9U.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BLp5nHeb.css">
+  <script type="module" crossorigin src="./assets/index-8wm5amcB.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DJpXInZN.css">
 </head>
 <body>
   <div id="stage"></div>
@@ -54,6 +54,7 @@
     </div>
     <div class="action-row">
       <button id="btn-play" class="icon-btn big" title="Play / pause (Space)">▶</button>
+      <input type="range" id="seek-bar" class="seek-bar hidden" min="0" max="1000" value="0" step="1" aria-label="Seek" />
       <span id="time-label" class="time"></span>
       <span class="spacer"></span>
       <button id="btn-snapshot" class="icon-btn" title="Save frame (S)">📷</button>
