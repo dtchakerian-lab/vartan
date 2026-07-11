@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import type { SongFingerprint } from '../audio/types';
-import type { WorldId } from '../visuals/VisualParams';
 
 /**
  * Derives everything the render layer needs from a fingerprint:
@@ -39,12 +38,6 @@ export function deriveStyle(fp: SongFingerprint): DerivedStyle {
   const speed = 0.5 + bpmNorm * 0.9 + fp.energy * 0.4;
 
   return { colorA, colorB, colorC, speed };
-}
-
-/** Auto-match: Flow adapts live to almost everything. */
-export function matchWorld(fp: SongFingerprint): WorldId {
-  if (fp.energy < 0.28 && fp.bpm < 88 && fp.beatRegularity < 0.45) return 'aurora';
-  return 'flow';
 }
 
 function lerp(a: number, b: number, t: number): number {

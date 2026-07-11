@@ -4,7 +4,7 @@ import { DemoSynth } from './audio/DemoSynth';
 import type { SongFingerprint } from './audio/types';
 import { DEFAULT_FINGERPRINT } from './audio/types';
 import { analyzeBuffer } from './analysis/SongAnalyzer';
-import { deriveStyle, matchWorld } from './analysis/fingerprint';
+import { deriveStyle } from './analysis/fingerprint';
 import type { DerivedStyle } from './analysis/fingerprint';
 import { VisualManager } from './visuals/VisualManager';
 import { Fallback2D } from './visuals/Fallback2D';
@@ -29,7 +29,6 @@ export class App {
 
   private fingerprint: SongFingerprint = { ...DEFAULT_FINGERPRINT };
   private style: DerivedStyle = deriveStyle(this.fingerprint);
-  private userPickedWorld = false;
   private source: SourceKind | null = null;
   private trackLabel = '';
   private loadToken = 0;
@@ -42,7 +41,6 @@ export class App {
     heroHint: byId('hero-hint'),
     controls: byId('controls'),
     chips: byId('world-chips'),
-    chkAuto: byId<HTMLInputElement>('chk-auto'),
     btnPlay: byId<HTMLButtonElement>('btn-play'),
     seekBar: byId<HTMLInputElement>('seek-bar'),
     btnMic: byId<HTMLButtonElement>('btn-mic'),
@@ -90,7 +88,6 @@ export class App {
     this.demo.stop();
     this.detector.reset();
     this.dynamics.reset();
-    this.userPickedWorld = false;
     this.source = 'file';
 
     this.el.analyzing.classList.remove('hidden');
@@ -106,11 +103,11 @@ export class App {
     }
     if (token !== this.loadToken) return;
 
-    // Play immediately with defaults; the fingerprint refines things async.
-    this.engine.play();
+    // Load paused: the user browses themes and hits play themselves.
     this.enterLiveUi();
     this.trackLabel = file.name.replace(/\.[a-z0-9]+$/i, '');
     this.el.trackTitle.textContent = this.trackLabel;
+    this.showToast('Ready — pick a theme, then press play.');
 
     // Metadata for track title (art lookup is silent; never switches worlds).
     void this.resolveMeta(file, token);
@@ -128,9 +125,6 @@ export class App {
   private applyFingerprint(fp: SongFingerprint): void {
     this.fingerprint = fp;
     this.style = deriveStyle(fp);
-    if (this.el.chkAuto.checked && !this.userPickedWorld && this.manager) {
-      this.setWorld(matchWorld(fp), false);
-    }
   }
 
   private async resolveMeta(file: File, token: number): Promise<void> {
@@ -163,7 +157,6 @@ export class App {
     this.detector.reset();
     this.dynamics.reset();
     this.source = 'mic';
-    this.userPickedWorld = false;
     this.applyFingerprint({ ...DEFAULT_FINGERPRINT, energy: 0.85, brightness: 0.65 });
     this.trackLabel = 'Microphone';
     this.el.trackTitle.textContent = 'Listening…';
@@ -178,7 +171,6 @@ export class App {
     this.detector.reset();
     this.dynamics.reset();
     this.source = 'demo';
-    this.userPickedWorld = false;
     this.applyFingerprint({
       bpm: 120,
       energy: 0.75,
@@ -231,15 +223,14 @@ export class App {
       chip.className = 'chip';
       chip.dataset.world = id;
       chip.textContent = WORLD_LABELS[id];
-      chip.addEventListener('click', () => this.setWorld(id, true));
+      chip.addEventListener('click', () => this.setWorld(id));
       this.el.chips.appendChild(chip);
     }
     this.refreshChips();
   }
 
-  private setWorld(id: WorldId, byUser: boolean): void {
+  private setWorld(id: WorldId): void {
     if (!this.manager) return;
-    if (byUser) this.userPickedWorld = true;
     this.manager.setWorld(id);
     this.refreshChips();
   }
@@ -387,13 +378,6 @@ export class App {
           this.el.unlockOverlay.classList.add('hidden');
         }
       });
-    });
-
-    this.el.chkAuto.addEventListener('change', () => {
-      if (this.el.chkAuto.checked && this.source) {
-        this.userPickedWorld = false;
-        this.setWorld(matchWorld(this.fingerprint), false);
-      }
     });
 
     const seek = this.el.seekBar;
