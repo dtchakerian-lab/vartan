@@ -24,9 +24,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          # npm 11 matches the lockfile generated locally (npm 10's npm ci can fail).
+          package-manager-cache: false
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Build
         run: npm run build
