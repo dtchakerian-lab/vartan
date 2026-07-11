@@ -216,13 +216,19 @@ export class App {
       this.setHint('Microphone blocked — drop an audio file instead.', true);
       return;
     }
+    if (!this.engine.unlocked) {
+      this.el.unlockOverlay.classList.remove('hidden');
+      this.setHint('Tap “Enable audio” on screen, then click Mic again.', true);
+      return;
+    }
     ++this.loadToken;
     this.detector.reset();
     this.source = 'mic';
     this.userPickedWorld = false;
-    this.applyFingerprint({ ...DEFAULT_FINGERPRINT, energy: 0.7 });
+    this.applyFingerprint({ ...DEFAULT_FINGERPRINT, energy: 0.85, brightness: 0.65 });
     this.trackLabel = 'Microphone';
     this.el.trackTitle.textContent = 'Listening…';
+    this.setHint('Clap near the laptop mic — level shows top-right.');
     this.enterLiveUi();
   }
 
@@ -504,15 +510,28 @@ export class App {
     const time = now / 1000;
 
     const frame = this.engine.getFrame(dt);
-    const beat = this.detector.update(frame.bass, time, dt);
+
+    let bass = frame.bass;
+    let mid = frame.mid;
+    let treble = frame.treble;
+    let volume = frame.volume;
+    if (this.source === 'mic') {
+      const micLvl = this.engine.micLevel();
+      volume = Math.max(volume, micLvl);
+      bass = Math.max(bass, micLvl * 0.55);
+      mid = Math.max(mid, micLvl * 0.9);
+      treble = Math.max(treble, micLvl * 0.35);
+    }
+
+    const beat = this.detector.update(bass, mid, treble, volume, time, dt);
 
     const params: VisualParams = {
       time,
       dt,
-      bass: frame.bass,
-      mid: frame.mid,
-      treble: frame.treble,
-      volume: frame.volume,
+      bass,
+      mid,
+      treble,
+      volume,
       beat,
       energy: this.fingerprint.energy,
       brightness: this.fingerprint.brightness,
@@ -529,7 +548,9 @@ export class App {
     if (this.source === 'file' && this.engine.duration > 0) {
       this.el.timeLabel.textContent = `${fmt(this.engine.currentTime)} / ${fmt(this.engine.duration)}`;
     } else if (this.source === 'mic') {
-      this.el.timeLabel.textContent = 'live';
+      const lvl = Math.round(volume * 100);
+      this.el.timeLabel.textContent =
+        lvl > 3 ? `mic ${lvl}%` : 'mic — clap near laptop';
     } else if (this.source === 'demo') {
       this.el.timeLabel.textContent = 'loop';
     } else {

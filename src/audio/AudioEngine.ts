@@ -13,8 +13,12 @@ export class AudioEngine {
   readonly ctx: AudioContext;
   readonly analyser: AnalyserNode;
   private readonly sourceBus: GainNode;
+  private readonly micGain: GainNode;
   private readonly monitorGain: GainNode;
   readonly recordDest: MediaStreamAudioDestinationNode;
+
+  /** 1..6 — mic-only pre-amp before the analyser. */
+  micBoost = 4;
 
   private freqData: Uint8Array<ArrayBuffer>;
 
@@ -46,6 +50,9 @@ export class AudioEngine {
     this.analyser.smoothingTimeConstant = 0.55;
 
     this.sourceBus = this.ctx.createGain();
+    this.micGain = this.ctx.createGain();
+    this.micGain.gain.value = 1;
+    this.micGain.connect(this.sourceBus);
     this.monitorGain = this.ctx.createGain();
     this.recordDest = this.ctx.createMediaStreamDestination();
 
@@ -133,15 +140,24 @@ export class AudioEngine {
 
   async useMic(): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true },
+      audio: {
+        echoCancellation: { ideal: false },
+        noiseSuppression: { ideal: false },
+        autoGainControl: { ideal: true },
+      },
     });
+    // Permission dialog ends the click gesture — resume again or analyser reads zeros.
+    await this.unlock();
     this.stopAll();
     this.micStream = stream;
     this.micSource = this.ctx.createMediaStreamSource(stream);
-    this.micSource.connect(this.sourceBus);
+    this.micSource.connect(this.micGain);
+    this.micGain.gain.value = this.micBoost;
+    this.analyser.smoothingTimeConstant = 0.3;
     this.monitorGain.gain.value = 0; // no speaker output -> no feedback
     this.mode = 'mic';
     this.playing = true;
+    await this.unlock();
   }
 
   /** Used by the demo synth: marks engine live without a buffer. */
@@ -169,8 +185,23 @@ export class AudioEngine {
       for (const t of this.micStream.getTracks()) t.stop();
       this.micStream = null;
     }
+    this.micGain.gain.value = 1;
+    this.analyser.smoothingTimeConstant = 0.55;
     this.playing = false;
     this.pausedAt = 0;
+  }
+
+  /** Live mic loudness 0..1 (time-domain RMS) — for UI feedback. */
+  micLevel(): number {
+    if (this.mode !== 'mic') return 0;
+    const td = new Uint8Array(this.analyser.fftSize);
+    this.analyser.getByteTimeDomainData(td);
+    let sum = 0;
+    for (let i = 0; i < td.length; i++) {
+      const v = (td[i] - 128) / 128;
+      sum += v * v;
+    }
+    return Math.min(1, Math.sqrt(sum / td.length) * 4);
   }
 
   /**
@@ -189,9 +220,15 @@ export class AudioEngine {
       return sum / ((hi - lo + 1) * 255);
     };
 
-    const bass = bandAvg(20, 250);
-    const mid = bandAvg(250, 2000);
-    const treble = bandAvg(2000, 12000);
+    let bass = bandAvg(20, 250);
+    let mid = bandAvg(250, 2000);
+    let treble = bandAvg(2000, 12000);
+    if (this.mode === 'mic') {
+      const k = this.micBoost * 0.45;
+      bass = Math.min(1, bass * k);
+      mid = Math.min(1, mid * k);
+      treble = Math.min(1, treble * k);
+    }
     const volume = bass * 0.5 + mid * 0.35 + treble * 0.15;
 
     const smooth = (prev: number, next: number): number => {
