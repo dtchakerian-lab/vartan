@@ -94,7 +94,7 @@ void main() {
 
   vec3 pos = position;
   float peak = h * h * 5.5 + h * 1.2;
-  pos.z = peak * (1.0 + uBass * 2.8 + uLiveEnergy * 1.1) + ripple;
+  pos.z = peak * (1.0 + uBass * 1.9 + uLiveEnergy * 0.8) + ripple;
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
@@ -226,7 +226,7 @@ export class FlowWorld extends VisualWorld {
     const hit = p.bassHit * 0.7 + p.midHit * 0.45 + p.beat * 0.5 + p.sectionPulse * 0.4;
     this.shake += (hit - this.shake) * Math.min(1, p.dt * 18);
     const t = p.time * 0.04 * p.liveSpeed;
-    const dist = 7.2 - p.bass * 1.4 - p.liveEnergy * 0.6 - p.sectionPulse * 0.9 + this.shake * 0.35;
+    const dist = 8.2 - p.bass * 0.8 - p.liveEnergy * 0.35 - p.sectionPulse * 0.5 + this.shake * 0.35;
     this.camera.position.set(
       Math.sin(t) * 0.35 + this.shake * 0.08 * Math.sin(p.time * 40),
       1.0 + p.mid * 0.35 + this.shake * 0.06,

@@ -11,6 +11,7 @@ uniform float uTime;
 uniform float uBass;
 uniform float uTreble;
 uniform float uBeat;
+uniform float uTrebleHit;
 uniform float uSpeed;
 uniform float uImpulse;
 uniform float uPixelRatio;
@@ -131,7 +132,7 @@ export class ParticleWorld extends VisualWorld {
     this.material.uniforms.uImpulse.value = this.impulse;
 
     const t = p.time * 0.05 * p.liveSpeed;
-    const dist = 5.5 - p.bass * 1.6 - p.liveEnergy * 0.8 - this.impulse * 0.4;
+    const dist = 6.0 - p.bass * 0.7 - p.liveEnergy * 0.35 - this.impulse * 0.3;
     this.camera.position.set(Math.sin(t) * dist, 1.2 + Math.sin(p.time * 0.3) * 0.3, Math.cos(t) * dist);
     this.camera.lookAt(0, 0, 0);
   }

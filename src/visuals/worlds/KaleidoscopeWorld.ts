@@ -17,7 +17,7 @@ void main() {
   vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
 
   // Beat zoom breathes the whole mandala.
-  float zoom = 1.0 + uBeat * 0.32 + uBass * 0.18 + uBassHit * 0.22;
+  float zoom = 1.0 + uBeat * 0.16 + uBass * 0.06 + uBassHit * 0.14;
   p /= zoom;
 
   float r = length(p);

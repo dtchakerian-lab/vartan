@@ -33,7 +33,7 @@ void main() {
 
   vHeight = h;
   vec3 pos = position;
-  pos.z = (h * h * 3.6 + h * 0.65) * (1.0 + uBass * 2.4 + uLiveEnergy * 1.2) + ripple;
+  pos.z = (h * h * 3.6 + h * 0.65) * (1.0 + uBass * 1.6 + uLiveEnergy * 0.8) + ripple;
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
