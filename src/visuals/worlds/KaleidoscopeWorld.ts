@@ -17,14 +17,14 @@ void main() {
   vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
 
   // Beat zoom breathes the whole mandala.
-  float zoom = 1.0 + uBeat * 0.18 + uBass * 0.1;
+  float zoom = 1.0 + uBeat * 0.32 + uBass * 0.18 + uBassHit * 0.22;
   p /= zoom;
 
   float r = length(p);
   float a = atan(p.y, p.x);
 
-  // Radial fold: segment count shifts subtly with mids.
-  float segs = 8.0 + floor(uMid * 4.0) * 2.0;
+  // Radial fold: segment count shifts with mids and hits.
+  float segs = 8.0 + floor((uMid + uMidHit * 0.8) * 5.0) * 2.0;
   float fold = PI / segs;
   a = mod(a, 2.0 * fold);
   a = abs(a - fold);
@@ -37,13 +37,14 @@ void main() {
   // Spectrum ring: frequency content mapped along the radius.
   float spec = texture2D(uSpectrum, vec2(fract(r * 1.4 - t * 0.3), 0.5)).r;
 
-  float rings = sin(r * (18.0 + uBass * 14.0) - uTime * uSpeed * 2.4 + n * 5.0);
-  rings = smoothstep(0.1, 0.9, rings * 0.5 + 0.5);
+  float rings = sin(r * (22.0 + uBass * 22.0 + uLiveEnergy * 8.0) - uTime * uSpeed * 2.8 + n * 5.0);
+  rings = smoothstep(0.05, 0.92, rings * 0.5 + 0.5);
 
   vec3 col = mix(uColorB, uColorA, rings);
-  col = mix(col, uColorC, spec * spec * 1.2);
-  col += uColorC * pow(1.0 - r, 3.0) * (uBass * 0.9 + uBeat * 0.6);
-  col *= 0.75 + n * 0.5;
+  col = mix(col, uColorC, spec * spec * 1.8);
+  col += uColorC * pow(1.0 - r, 3.0) * (uBass * 1.4 + uBeat * 0.9 + uMidHit * 0.7);
+  col += uColorA * uTrebleHit * 0.35;
+  col *= 0.65 + uLiveEnergy * 0.55 + n * 0.5;
 
   // Center glow + edge fade.
   col *= smoothstep(1.15, 0.35, r);

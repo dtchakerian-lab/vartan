@@ -14,6 +14,9 @@ uniform sampler2D uHistory;
 uniform float uHistRow;
 uniform float uBass;
 uniform float uBeat;
+uniform float uBassHit;
+uniform float uMidHit;
+uniform float uLiveEnergy;
 varying vec2 vUv;
 varying float vHeight;
 
@@ -25,11 +28,12 @@ void main() {
 
   // Emphasize peaks, add beat ripple radiating from center.
   float centerDist = abs(uv.x - 0.5) * 2.0;
-  float ripple = uBeat * 0.35 * sin(centerDist * 14.0 - uBeat * 4.0) * (1.0 - centerDist);
+  float ripple = (uBeat + uBassHit * 0.9) * 0.55
+    * sin(centerDist * 16.0 - uBeat * 6.0 - uMidHit * 5.0) * (1.0 - centerDist);
 
   vHeight = h;
   vec3 pos = position;
-  pos.z = (h * h * 2.4 + h * 0.4) * (1.0 + uBass * 0.8) + ripple;
+  pos.z = (h * h * 3.6 + h * 0.65) * (1.0 + uBass * 2.4 + uLiveEnergy * 1.2) + ripple;
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }

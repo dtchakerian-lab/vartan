@@ -304,6 +304,21 @@ body {
   align-items: center;
   gap: 12px;
   justify-content: center;
+  flex-wrap: wrap;
+}
+
+.seek-bar {
+  flex: 1 1 140px;
+  max-width: min(420px, 52vw);
+  height: 6px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0 4px;
+}
+
+.seek-bar::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
 }
 
 .icon-btn {

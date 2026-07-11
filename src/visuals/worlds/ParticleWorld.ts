@@ -41,7 +41,7 @@ void main() {
   vDepth = clamp(-mv.z / 9.0, 0.0, 1.0);
   gl_Position = projectionMatrix * mv;
 
-  float size = (1.4 + aSeed * 2.4) * (1.0 + uTreble * 1.6 + uBeat * 0.8);
+  float size = (1.4 + aSeed * 2.4) * (1.0 + uTreble * 2.4 + uBeat * 1.2 + uTrebleHit * 1.8);
   gl_PointSize = size * uPixelRatio * (4.5 / max(0.5, -mv.z));
 }
 `;
@@ -52,6 +52,7 @@ uniform vec3 uColorA;
 uniform vec3 uColorB;
 uniform vec3 uColorC;
 uniform float uBass;
+uniform float uLiveEnergy;
 varying float vSeed;
 varying float vDepth;
 
@@ -63,7 +64,7 @@ void main() {
 
   vec3 col = mix(uColorA, uColorC, vSeed);
   col = mix(col, uColorB, vDepth * 0.6);
-  col *= 0.7 + uBass * 0.8;
+  col *= 0.55 + uBass * 1.2 + uLiveEnergy * 0.45;
 
   gl_FragColor = vec4(col * glow, glow);
 }
@@ -120,18 +121,17 @@ export class ParticleWorld extends VisualWorld {
 
   update(p: VisualParams, ctx: WorldContext): void {
     updateSharedUniforms(this.uniforms, p, this.aspect, ctx.spectrumTex);
-    // Mirror shared values into the material (it holds a merged uniform set).
     for (const key of Object.keys(this.uniforms)) {
       this.material.uniforms[key].value = this.uniforms[key].value;
     }
 
-    // Beat impulse with spring-back.
-    this.impulse += (p.beat - this.impulse) * Math.min(1, p.dt * 12);
+    // Beat + transient impulse with spring-back.
+    const hit = p.beat + p.bassHit * 0.85 + p.midHit * 0.55;
+    this.impulse += (hit - this.impulse) * Math.min(1, p.dt * 16);
     this.material.uniforms.uImpulse.value = this.impulse;
 
-    // Slow camera orbit; bass adds a push-in.
-    const t = p.time * 0.05 * p.speed;
-    const dist = 5.5 - p.bass * 0.9;
+    const t = p.time * 0.05 * p.liveSpeed;
+    const dist = 5.5 - p.bass * 1.6 - p.liveEnergy * 0.8 - this.impulse * 0.4;
     this.camera.position.set(Math.sin(t) * dist, 1.2 + Math.sin(p.time * 0.3) * 0.3, Math.cos(t) * dist);
     this.camera.lookAt(0, 0, 0);
   }

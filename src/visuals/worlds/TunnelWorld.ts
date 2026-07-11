@@ -23,13 +23,13 @@ void main() {
   float a = atan(p.y, p.x);
 
   // Fly forward: depth coordinate from inverse radius.
-  float fly = uTime * uSpeed * 1.6;
+  float fly = uTime * uSpeed * 2.2;
   float z = 0.35 / r + fly;
 
-  // Neon rings: pulse thickness with bass, snap with beat.
+  // Neon rings: pulse thickness with bass, snap with beat + hits.
   float ringFreq = 2.0;
   float ring = fract(z * ringFreq);
-  float thickness = 0.06 + uBass * 0.1 + uBeat * 0.08;
+  float thickness = 0.05 + uBass * 0.16 + uBeat * 0.14 + uBassHit * 0.12;
   float glow = smoothstep(thickness, 0.0, abs(ring - 0.5) * (1.0 / ringFreq) * 2.0);
 
   // Angular struts sampled from the spectrum: music paints the walls.
@@ -48,7 +48,8 @@ void main() {
   col *= mix(0.25, 1.15, depth);
 
   // Beat flash down the tunnel core.
-  col += uColorC * pow(1.0 - r, 5.0) * uBeat * 1.4;
+  col += uColorC * pow(1.0 - r, 5.0) * (uBeat * 2.0 + uMidHit * 1.2);
+  col *= 0.85 + uLiveEnergy * 0.45 + uTrebleHit * 0.25;
 
   gl_FragColor = vec4(col, 1.0);
 }

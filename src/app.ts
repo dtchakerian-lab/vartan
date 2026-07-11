@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { AudioEngine } from './audio/AudioEngine';
 import { BeatDetector } from './audio/BeatDetector';
 import { DemoSynth } from './audio/DemoSynth';
@@ -10,10 +9,9 @@ import type { DerivedStyle } from './analysis/fingerprint';
 import { VisualManager } from './visuals/VisualManager';
 import { Fallback2D } from './visuals/Fallback2D';
 import type { VisualParams, WorldId } from './visuals/VisualParams';
-import { WORLD_IDS, WORLD_LABELS } from './visuals/VisualParams';
+import { WORLD_IDS, WORLD_LABELS, deriveLiveColors } from './visuals/VisualParams';
 import { parseTrackMeta } from './metadata/MetadataParser';
-import { fetchITunesArt, loadArtImage } from './metadata/iTunesArt';
-import { generatePoster } from './metadata/poster';
+import { AudioDynamics } from './audio/AudioDynamics';
 import { saveSnapshot } from './export/snapshot';
 import { ClipRecorder } from './export/recorder';
 
@@ -22,6 +20,7 @@ type SourceKind = 'file' | 'mic' | 'demo';
 export class App {
   private engine = new AudioEngine();
   private detector = new BeatDetector();
+  private dynamics = new AudioDynamics();
   private demo = new DemoSynth(this.engine);
   private recorder = new ClipRecorder();
 
@@ -30,11 +29,11 @@ export class App {
 
   private fingerprint: SongFingerprint = { ...DEFAULT_FINGERPRINT };
   private style: DerivedStyle = deriveStyle(this.fingerprint);
-  private hasRealArt = false;
   private userPickedWorld = false;
   private source: SourceKind | null = null;
   private trackLabel = '';
   private loadToken = 0;
+  private scrubbing = false;
 
   // UI elements
   private el = {
@@ -45,6 +44,7 @@ export class App {
     chips: byId('world-chips'),
     chkAuto: byId<HTMLInputElement>('chk-auto'),
     btnPlay: byId<HTMLButtonElement>('btn-play'),
+    seekBar: byId<HTMLInputElement>('seek-bar'),
     btnMic: byId<HTMLButtonElement>('btn-mic'),
     btnDemo: byId<HTMLButtonElement>('btn-demo'),
     btnSnapshot: byId<HTMLButtonElement>('btn-snapshot'),
@@ -89,8 +89,8 @@ export class App {
 
     this.demo.stop();
     this.detector.reset();
+    this.dynamics.reset();
     this.userPickedWorld = false;
-    this.hasRealArt = false;
     this.source = 'file';
 
     this.el.analyzing.classList.remove('hidden');
@@ -112,8 +112,8 @@ export class App {
     this.trackLabel = file.name.replace(/\.[a-z0-9]+$/i, '');
     this.el.trackTitle.textContent = this.trackLabel;
 
-    // Metadata + artwork chain (fully async, silent failures).
-    void this.resolveArt(file, token);
+    // Metadata for track title (art lookup is silent; never switches worlds).
+    void this.resolveMeta(file, token);
 
     // Fingerprint analysis.
     try {
@@ -128,14 +128,12 @@ export class App {
   private applyFingerprint(fp: SongFingerprint): void {
     this.fingerprint = fp;
     this.style = deriveStyle(fp);
-    this.regeneratePosterIfNeeded();
     if (this.el.chkAuto.checked && !this.userPickedWorld && this.manager) {
-      this.setWorld(matchWorld(fp, this.hasRealArt), false);
+      this.setWorld(matchWorld(fp), false);
     }
   }
 
-  private async resolveArt(file: File, token: number): Promise<void> {
-    if (!this.manager) return;
+  private async resolveMeta(file: File, token: number): Promise<void> {
     const meta = await parseTrackMeta(file);
     if (token !== this.loadToken) return;
 
@@ -144,66 +142,6 @@ export class App {
       this.el.trackTitle.textContent = this.trackLabel;
     }
     if (meta.genreHint) this.fingerprint.genreHint = meta.genreHint;
-
-    // 1. Embedded ID3 art.
-    if (meta.embeddedArtUrl) {
-      const img = await loadArtImage(meta.embeddedArtUrl);
-      if (img && token === this.loadToken) {
-        this.setArtFromImage(img, true);
-        return;
-      }
-    }
-
-    // 2. iTunes fallback (silent fail by design).
-    if (meta.artist || meta.title) {
-      const url = await fetchITunesArt(meta.artist, meta.title);
-      if (url && token === this.loadToken) {
-        const img = await loadArtImage(url);
-        if (img && token === this.loadToken) {
-          this.setArtFromImage(img, true);
-          return;
-        }
-      }
-    }
-
-    // 3. Generated poster so Album Pulse always has something.
-    if (token === this.loadToken) this.setPosterArt();
-  }
-
-  private setArtFromImage(img: HTMLImageElement, real: boolean): void {
-    if (!this.manager) return;
-    const tex = new THREE.Texture(img);
-    tex.needsUpdate = true;
-    this.manager.albumWorld.setArt(tex, img.width / img.height);
-    if (real) {
-      this.hasRealArt = true;
-      if (this.el.chkAuto.checked && !this.userPickedWorld) {
-        this.setWorld('album', false);
-      }
-    }
-  }
-
-  private setPosterArt(): void {
-    if (!this.manager) return;
-    const [title, artist] = this.trackLabel.includes(' — ')
-      ? this.trackLabel.split(' — ').reverse()
-      : [this.trackLabel, ''];
-    const canvas = generatePoster(
-      title,
-      artist,
-      this.style.colorA,
-      this.style.colorB,
-      this.style.colorC,
-    );
-    const tex = new THREE.CanvasTexture(canvas);
-    this.manager.albumWorld.setArt(tex, 1);
-  }
-
-  private regeneratePosterIfNeeded(): void {
-    // Poster uses palette colors; refresh it once the real palette is known.
-    if (this.manager && !this.hasRealArt && this.source === 'file') {
-      if (this.manager.albumWorld.hasArt) this.setPosterArt();
-    }
   }
 
   private async useMic(): Promise<void> {
@@ -223,6 +161,7 @@ export class App {
     }
     ++this.loadToken;
     this.detector.reset();
+    this.dynamics.reset();
     this.source = 'mic';
     this.userPickedWorld = false;
     this.applyFingerprint({ ...DEFAULT_FINGERPRINT, energy: 0.85, brightness: 0.65 });
@@ -237,6 +176,7 @@ export class App {
     this.checkUnlocked();
     ++this.loadToken;
     this.detector.reset();
+    this.dynamics.reset();
     this.source = 'demo';
     this.userPickedWorld = false;
     this.applyFingerprint({
@@ -252,18 +192,12 @@ export class App {
     this.enterLiveUi();
   }
 
-  private handleImageDrop(file: File): void {
-    const url = URL.createObjectURL(file);
-    void loadArtImage(url).then((img) => {
-      URL.revokeObjectURL(url);
-      if (!img) {
-        this.showToast("Couldn't read that image.");
-        return;
-      }
-      this.setArtFromImage(img, true);
-      if (this.manager && this.source) this.setWorld('album', true);
-      this.showToast('Artwork loaded — Pulse mode.');
-    });
+  private routeFile(file: File): void {
+    if (file.type.startsWith('image/')) {
+      this.showToast('Drop an audio file — visuals react to the music itself.');
+      return;
+    }
+    void this.loadAudioFile(file);
   }
 
   private eject(): void {
@@ -319,11 +253,10 @@ export class App {
 
   private updatePlayButton(): void {
     const btn = this.el.btnPlay;
-    if (this.source === 'mic') {
-      btn.style.display = 'none';
-      return;
-    }
-    btn.style.display = '';
+    const showTransport = this.source === 'file';
+    btn.style.display = this.source === 'mic' ? 'none' : '';
+    this.el.seekBar.classList.toggle('hidden', !showTransport);
+    if (this.source === 'mic') return;
     const playing =
       this.source === 'demo' ? this.demo.running : this.engine.playing;
     btn.textContent = playing ? '⏸' : '▶';
@@ -459,8 +392,22 @@ export class App {
     this.el.chkAuto.addEventListener('change', () => {
       if (this.el.chkAuto.checked && this.source) {
         this.userPickedWorld = false;
-        this.setWorld(matchWorld(this.fingerprint, this.hasRealArt), false);
+        this.setWorld(matchWorld(this.fingerprint), false);
       }
+    });
+
+    const seek = this.el.seekBar;
+    seek.addEventListener('pointerdown', () => {
+      this.scrubbing = true;
+    });
+    seek.addEventListener('pointerup', () => {
+      this.scrubbing = false;
+    });
+    seek.addEventListener('input', () => {
+      if (this.source !== 'file' || this.engine.duration <= 0) return;
+      const t = (Number(seek.value) / 1000) * this.engine.duration;
+      this.engine.seek(t);
+      this.el.timeLabel.textContent = `${fmt(t)} / ${fmt(this.engine.duration)}`;
     });
 
     this.engine.onended = () => this.updatePlayButton();
@@ -485,18 +432,6 @@ export class App {
         this.snapshot();
       }
     });
-  }
-
-  private routeFile(file: File): void {
-    if (file.type.startsWith('image/')) {
-      if (!this.source) {
-        this.showToast('Load a song first, then drop artwork.');
-        return;
-      }
-      this.handleImageDrop(file);
-    } else {
-      void this.loadAudioFile(file);
-    }
   }
 
   // ---------------------------------------------------------------- loop
@@ -524,6 +459,8 @@ export class App {
     }
 
     const beat = this.detector.update(bass, mid, treble, volume, time, dt);
+    const live = this.dynamics.update(bass, mid, treble, volume, frame.spectrum, beat, dt);
+    const colors = deriveLiveColors(this.style, live);
 
     const params: VisualParams = {
       time,
@@ -533,27 +470,40 @@ export class App {
       treble,
       volume,
       beat,
+      bassHit: live.bassHit,
+      midHit: live.midHit,
+      trebleHit: live.trebleHit,
+      liveEnergy: live.liveEnergy,
+      liveSpeed: live.liveSpeed,
       energy: this.fingerprint.energy,
       brightness: this.fingerprint.brightness,
       speed: this.style.speed,
-      colorA: this.style.colorA,
-      colorB: this.style.colorB,
-      colorC: this.style.colorC,
+      colorA: colors.colorA,
+      colorB: colors.colorB,
+      colorC: colors.colorC,
     };
 
     if (this.manager) this.manager.render(params, frame.spectrum);
     else this.fallback?.render(params, frame.spectrum);
 
-    // Time readout for file playback.
+    // Transport readout + seek bar for file playback.
     if (this.source === 'file' && this.engine.duration > 0) {
+      this.el.seekBar.classList.remove('hidden');
+      if (!this.scrubbing) {
+        const pct = (this.engine.currentTime / this.engine.duration) * 1000;
+        this.el.seekBar.value = String(Math.round(pct));
+      }
       this.el.timeLabel.textContent = `${fmt(this.engine.currentTime)} / ${fmt(this.engine.duration)}`;
     } else if (this.source === 'mic') {
+      this.el.seekBar.classList.add('hidden');
       const lvl = Math.round(volume * 100);
       this.el.timeLabel.textContent =
         lvl > 3 ? `mic ${lvl}%` : 'mic — clap near laptop';
     } else if (this.source === 'demo') {
+      this.el.seekBar.classList.add('hidden');
       this.el.timeLabel.textContent = 'loop';
     } else {
+      this.el.seekBar.classList.add('hidden');
       this.el.timeLabel.textContent = '';
     }
   };

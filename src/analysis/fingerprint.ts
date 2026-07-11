@@ -16,10 +16,9 @@ export interface DerivedStyle {
 }
 
 export function deriveStyle(fp: SongFingerprint): DerivedStyle {
-  // Hue base: dark tracks live in violet/indigo, bright tracks in cyan..amber.
   const hueBase = fp.brightness < 0.45
-    ? lerp(0.72, 0.62, fp.brightness / 0.45) // violet -> indigo
-    : lerp(0.55, 0.08, (fp.brightness - 0.45) / 0.55); // cyan -> amber
+    ? lerp(0.72, 0.62, fp.brightness / 0.45)
+    : lerp(0.55, 0.08, (fp.brightness - 0.45) / 0.55);
 
   const sat = lerp(0.45, 0.95, fp.energy);
   const lum = lerp(0.35, 0.55, fp.brightness);
@@ -31,7 +30,7 @@ export function deriveStyle(fp: SongFingerprint): DerivedStyle {
     lum * 0.8,
   );
   const colorC = new THREE.Color().setHSL(
-    frac(hueBase + 0.5), // complement accent
+    frac(hueBase + 0.5),
     Math.min(1, sat * 1.1),
     lerp(0.5, 0.68, fp.energy),
   );
@@ -42,16 +41,10 @@ export function deriveStyle(fp: SongFingerprint): DerivedStyle {
   return { colorA, colorB, colorC, speed };
 }
 
-/** Auto-match: pick a starting world from the fingerprint. */
-export function matchWorld(fp: SongFingerprint, hasArt: boolean): WorldId {
-  if (hasArt) return 'album';
-  if (fp.energy < 0.35 && fp.bpm < 100) return 'aurora';
-  if (fp.bassRatio > 0.52) return 'waves';
-  if (fp.bpm >= 125 && fp.energy > 0.6) {
-    return fp.brightness > 0.55 ? 'particles' : 'tunnel';
-  }
-  if (fp.brightness > 0.6) return 'kaleidoscope';
-  return 'particles';
+/** Auto-match: Flow adapts live to almost everything. */
+export function matchWorld(fp: SongFingerprint): WorldId {
+  if (fp.energy < 0.28 && fp.bpm < 88 && fp.beatRegularity < 0.45) return 'aurora';
+  return 'flow';
 }
 
 function lerp(a: number, b: number, t: number): number {

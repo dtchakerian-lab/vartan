@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import type { VisualParams, WorldId } from './VisualParams';
 import type { VisualWorld, WorldContext } from './VisualWorld';
+import { FlowWorld } from './worlds/FlowWorld';
 import { AuroraWorld } from './worlds/AuroraWorld';
 import { ParticleWorld } from './worlds/ParticleWorld';
 import { KaleidoscopeWorld } from './worlds/KaleidoscopeWorld';
 import { WaveWorld } from './worlds/WaveWorld';
 import { TunnelWorld } from './worlds/TunnelWorld';
-import { AlbumWorld } from './worlds/AlbumWorld';
 
 const SPECTRUM_BINS = 64;
 const HISTORY_ROWS = 64;
@@ -20,7 +20,7 @@ export class VisualManager {
   readonly canvas: HTMLCanvasElement;
 
   private worlds = new Map<WorldId, VisualWorld>();
-  private activeId: WorldId = 'particles';
+  private activeId: WorldId = 'flow';
   private ctx: WorldContext;
 
   private spectrumTex: THREE.DataTexture;
@@ -32,7 +32,7 @@ export class VisualManager {
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      preserveDrawingBuffer: true, // snapshots
+      preserveDrawingBuffer: true,
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -72,11 +72,15 @@ export class VisualManager {
     };
 
     this.resize();
+    this.setWorld('flow');
   }
 
   private createWorld(id: WorldId): VisualWorld {
     let world: VisualWorld;
     switch (id) {
+      case 'flow':
+        world = new FlowWorld();
+        break;
       case 'aurora':
         world = new AuroraWorld();
         break;
@@ -91,9 +95,6 @@ export class VisualManager {
         break;
       case 'tunnel':
         world = new TunnelWorld();
-        break;
-      case 'album':
-        world = new AlbumWorld();
         break;
     }
     world.init(this.ctx);
@@ -119,13 +120,7 @@ export class VisualManager {
     return this.activeId;
   }
 
-  get albumWorld(): AlbumWorld {
-    return this.getWorld('album') as AlbumWorld;
-  }
-
-  /** Push this frame's spectrum into the shared textures. */
   private updateTextures(spectrum: Uint8Array): void {
-    // Group the useful lower half of FFT bins into SPECTRUM_BINS buckets.
     const usable = Math.floor(spectrum.length * 0.5);
     const group = Math.max(1, Math.floor(usable / SPECTRUM_BINS));
     for (let i = 0; i < SPECTRUM_BINS; i++) {

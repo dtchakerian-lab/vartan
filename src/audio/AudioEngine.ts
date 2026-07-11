@@ -138,6 +138,18 @@ export class AudioEngine {
     return this.buffer?.duration ?? 0;
   }
 
+  /** Jump to a position in seconds (file mode). Keeps play/pause state. */
+  seek(seconds: number): void {
+    if (this.mode !== 'file' || !this.buffer) return;
+    const t = Math.max(0, Math.min(seconds, this.buffer.duration));
+    const wasPlaying = this.playing;
+    if (this.playing) {
+      this.pause();
+    }
+    this.pausedAt = t;
+    if (wasPlaying) this.play();
+  }
+
   async useMic(): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -232,7 +244,9 @@ export class AudioEngine {
     const volume = bass * 0.5 + mid * 0.35 + treble * 0.15;
 
     const smooth = (prev: number, next: number): number => {
-      const k = next > prev ? 1 - Math.exp(-dt * 30) : 1 - Math.exp(-dt * 6);
+      const attack = 1 - Math.exp(-dt * 45);
+      const release = 1 - Math.exp(-dt * 14);
+      const k = next > prev ? attack : release;
       return prev + (next - prev) * k;
     };
     this.sBass = smooth(this.sBass, bass);

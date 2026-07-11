@@ -15,28 +15,30 @@ void main() {
   vec2 uv = vUv;
   vec2 p = (uv - 0.5) * vec2(uAspect, 1.0);
 
-  float t = uTime * (0.06 + uSpeed * 0.05);
+  float t = uTime * (0.06 + uLiveSpeed * 0.08);
 
   // Vertical aurora curtains: domain-warped fbm.
   vec2 q = vec2(fbm(p * 1.6 + vec2(t * 0.7, -t * 0.3)),
                 fbm(p * 1.6 + vec2(-t * 0.4, t * 0.5) + 4.7));
-  float curtain = fbm(p * vec2(2.2, 0.9) + q * (1.2 + uBass * 1.4) + vec2(0.0, -t));
+  float curtain = fbm(p * vec2(2.2, 0.9) + q * (1.4 + uBass * 2.2 + uLiveEnergy * 1.6) + vec2(0.0, -t));
 
   // Height falloff so it hangs from the top like an aurora.
   float band = smoothstep(0.15, 0.75, curtain) * smoothstep(0.95, 0.1, uv.y * 0.9 - curtain * 0.35);
 
   // Spectrum shimmer along x.
   float spec = texture2D(uSpectrum, vec2(uv.x, 0.5)).r;
-  band += spec * 0.22 * smoothstep(0.6, 0.0, abs(uv.y - 0.35));
+  band += spec * 0.38 * smoothstep(0.6, 0.0, abs(uv.y - 0.35));
 
   vec3 col = mix(uColorB * 0.35, uColorA, band);
-  col += uColorC * band * band * (0.35 + uTreble * 0.9);
+  col += uColorC * band * band * (0.45 + uTreble * 1.4 + uTrebleHit * 1.2);
 
-  // Bass bloom: whole sky breathes.
-  col *= 0.85 + uBass * 0.55 + uBeat * 0.3;
+  // Bass bloom + hit flashes.
+  col *= 0.7 + uLiveEnergy * 0.65 + uBass * 0.75 + uBeat * 0.55;
+  col += uColorC * uMidHit * 0.35;
+  col += uColorA * uBassHit * 0.28;
 
   // Star field in the dark regions.
-  float stars = step(0.9985, hash21(floor(p * 220.0))) * (0.4 + uTreble);
+  float stars = step(0.9985, hash21(floor(p * 220.0))) * (0.4 + uTreble + uTrebleHit * 1.5);
   col += stars * (1.0 - band) * 0.8;
 
   // Soft vignette.
