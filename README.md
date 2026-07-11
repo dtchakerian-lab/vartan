@@ -16,7 +16,19 @@ npm run build    # production build to dist/
 
 ## Deploy
 
-Pushing to `main` auto-deploys to GitHub Pages via `.github/workflows/deploy.yml` (Settings → Pages → Source: GitHub Actions). The app is served at `https://<username>.github.io/vartan/`.
+After pushing to `main`, the workflow builds and publishes `dist/` to the **`gh-pages` branch**.
+
+**One-time GitHub setup:**
+
+1. Repo **Settings → Pages**
+2. **Build and deployment → Source:** choose **Deploy from a branch**
+3. **Branch:** `gh-pages` → folder **`/ (root)`** → Save
+
+If `gh-pages` does not appear yet, run the workflow once (Actions tab), then refresh Settings.
+
+Live URL: `https://dtchakerian-lab.github.io/vartan/`
+
+Also ensure **Settings → Actions → General → Workflow permissions** is set to **Read and write permissions** (required for the deploy push).
 
 ## Features
 
