@@ -7,18 +7,37 @@
   <meta name="description" content="Vartan — drop a song, watch it become living visuals. Free, private, works offline." />
   <link rel="manifest" href="manifest.webmanifest" />
   <title>Vartan — Music Visualizer</title>
-  <script type="module" crossorigin src="./assets/index-BI4L-Tp3.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-B7ET1Hbz.css">
+  <script type="module" crossorigin src="./assets/index-BCJpMbEi.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-PYOTgP1T.css">
 </head>
 <body>
   <div id="stage"></div>
+
+  <!-- Split compare overlays -->
+  <div id="split-overlay" class="hidden" aria-hidden="true">
+    <div class="split-divider"></div>
+    <div id="split-label-a" class="split-label left">A</div>
+    <div id="split-label-b" class="split-label right">B</div>
+  </div>
+
+  <!-- Band meters -->
+  <div id="meters" class="hidden" aria-hidden="true">
+    <div class="meter"><span>B</span><div class="meter-track"><div id="meter-bass" class="meter-fill"></div></div></div>
+    <div class="meter"><span>M</span><div class="meter-track"><div id="meter-mid" class="meter-fill"></div></div></div>
+    <div class="meter"><span>T</span><div class="meter-track"><div id="meter-treble" class="meter-fill"></div></div></div>
+  </div>
 
   <!-- Top bar -->
   <header id="topbar" class="ui-layer">
     <div class="brand">VARTAN</div>
     <div id="track-title" class="track-title"></div>
+    <button id="bpm-pill" class="bpm-pill hidden" type="button" title="Track info">— BPM</button>
+    <button id="btn-options" class="icon-btn" title="Options (O)" aria-label="Options">⚙</button>
     <button id="btn-fullscreen" class="icon-btn" title="Fullscreen (F)" aria-label="Fullscreen">⛶</button>
   </header>
+
+  <!-- Floating gear when Clean UI hides the top bar -->
+  <button id="btn-options-float" class="icon-btn float-gear hidden" title="Options (O)" aria-label="Options">⚙</button>
 
   <!-- Hero / input panel -->
   <section id="hero" class="ui-layer">
@@ -43,6 +62,86 @@
   <!-- Analyzing indicator -->
   <div id="analyzing" class="hidden"><div class="bar"></div><span>Reading the music…</span></div>
 
+  <!-- Options drawer -->
+  <div id="drawer-backdrop" class="hidden"></div>
+  <aside id="options-drawer" class="hidden" aria-label="Options">
+    <div class="drawer-head">
+      <h2>Options</h2>
+      <button id="btn-drawer-close" class="icon-btn" type="button" title="Close" aria-label="Close">✕</button>
+    </div>
+
+    <details class="drawer-section" open>
+      <summary>Track info</summary>
+      <div class="drawer-body">
+        <div class="info-row"><span>BPM</span><strong id="info-bpm">—</strong></div>
+        <div class="info-row"><span>Energy</span><strong id="info-energy">—</strong></div>
+        <div class="info-row"><span>Bass</span><strong id="info-bass">—</strong></div>
+        <div class="info-row"><span>Brightness</span><strong id="info-bright">—</strong></div>
+        <div class="info-row"><span>Tap tempo</span><strong id="info-tap">—</strong></div>
+      </div>
+    </details>
+
+    <details class="drawer-section">
+      <summary>Display</summary>
+      <div class="drawer-body">
+        <label class="field-label">Intensity</label>
+        <div class="seg-row" id="intensity-row" role="group" aria-label="Intensity">
+          <button type="button" class="seg-btn" data-intensity="calm">Calm</button>
+          <button type="button" class="seg-btn active" data-intensity="normal">Normal</button>
+          <button type="button" class="seg-btn" data-intensity="intense">Intense</button>
+        </div>
+        <label class="toggle-row">
+          <span>Show meters</span>
+          <input type="checkbox" id="opt-meters" />
+        </label>
+        <label class="toggle-row">
+          <span>Clean UI</span>
+          <input type="checkbox" id="opt-clean" />
+        </label>
+      </div>
+    </details>
+
+    <details class="drawer-section">
+      <summary>Practice</summary>
+      <div class="drawer-body">
+        <label class="field-label">A–B loop</label>
+        <div class="btn-row">
+          <button type="button" class="pill-btn sm" id="btn-loop-a">Set A</button>
+          <button type="button" class="pill-btn sm" id="btn-loop-b">Set B</button>
+          <button type="button" class="pill-btn sm" id="btn-loop-clear">Clear</button>
+        </div>
+        <p id="loop-status" class="drawer-hint">No loop</p>
+        <label class="toggle-row">
+          <span>Metronome</span>
+          <input type="checkbox" id="opt-metro" />
+        </label>
+        <button type="button" class="pill-btn sm full" id="btn-tap-tempo">Tap tempo</button>
+      </div>
+    </details>
+
+    <details class="drawer-section" id="compare-section">
+      <summary>Compare</summary>
+      <div class="drawer-body">
+        <p id="compare-hint" class="drawer-hint">Load a file first to compare tracks.</p>
+        <div id="compare-controls" class="compare-controls disabled">
+          <button type="button" class="pill-btn sm full" id="btn-load-b">Drop / load Track B</button>
+          <p id="track-b-label" class="drawer-hint">No Track B</p>
+          <label class="toggle-row">
+            <span>Split view</span>
+            <input type="checkbox" id="opt-split" disabled />
+          </label>
+          <label class="field-label">Hear</label>
+          <div class="seg-row" id="hear-row" role="group" aria-label="Hear">
+            <button type="button" class="seg-btn active" data-hear="a">A</button>
+            <button type="button" class="seg-btn" data-hear="b">B</button>
+            <button type="button" class="seg-btn" data-hear="mix">Mix</button>
+          </div>
+          <button type="button" class="pill-btn sm full" id="btn-clear-b">Clear Track B</button>
+        </div>
+      </div>
+    </details>
+  </aside>
+
   <!-- Bottom controls -->
   <footer id="controls" class="ui-layer hidden">
     <div class="world-row">
@@ -50,7 +149,13 @@
     </div>
     <div class="action-row">
       <button id="btn-play" class="icon-btn big" title="Play / pause (Space)">▶</button>
-      <input type="range" id="seek-bar" class="seek-bar hidden" min="0" max="1000" value="0" step="1" aria-label="Seek" />
+      <div id="seek-wrap" class="seek-wrap hidden">
+        <input type="range" id="seek-bar" class="seek-bar" min="0" max="1000" value="0" step="1" aria-label="Seek" />
+        <div id="loop-marks" class="loop-marks hidden">
+          <span id="loop-mark-a" class="loop-mark"></span>
+          <span id="loop-mark-b" class="loop-mark"></span>
+        </div>
+      </div>
       <span id="time-label" class="time"></span>
       <span class="spacer"></span>
       <button id="btn-snapshot" class="icon-btn" title="Save frame (S)">📷</button>
@@ -64,6 +169,7 @@
   <div id="toast" class="hidden"></div>
 
   <input type="file" id="file-input" accept="audio/*,image/*" hidden />
+  <input type="file" id="file-input-b" accept="audio/*" hidden />
 
 </body>
 </html>
