@@ -33,8 +33,38 @@ Also ensure **Settings → Actions → General → Workflow permissions** is set
 ## Features
 
 - Audio file upload (MP3/WAV/M4A/OGG), microphone, or built-in demo beat
-- Six visual worlds: Aurora, Galaxy, Prism, Terrain, Neon, Pulse
-- Auto-match: song fingerprint (BPM, energy, bass, brightness) picks the style and palette
-- Album Pulse: embedded cover art, iTunes lookup (silent fallback), manual image drop, or generated poster
+- Six visual worlds: **Flow**, Aurora, Galaxy, Prism, Terrain, Neon
+- Offline song fingerprint (BPM, energy, bass, brightness) drives palette + motion
+- **Options drawer** (gear / `O`): musician tools without cluttering the canvas
+  - **Track info** — BPM pill + energy/bass/brightness readout; tap-tempo result
+  - **Display** — intensity Calm / Normal / Intense (fixes over-zoom on Flow/Terrain); band meters; Clean UI
+  - **Practice** — A–B loop on the seek bar; metronome from detected (or tapped) BPM; tap tempo
+  - **Compare** — load Track B, **split canvas A|B**, Hear A / Hear B / Mix (file mode only)
 - Save PNG snapshots, record 30-second clips (with audio), fullscreen
 - Canvas2D fallback when WebGL is unavailable
+
+## Not supported (by design)
+
+- No YouTube / remote URL convert — save an MP3 locally, then drop it in
+- No accounts, cloud sync, or settings persistence (options reset on reload)
+- No backend, API keys, or audio leaving the device
+
+## Keyboard
+
+| Key | Action |
+|-----|--------|
+| Space | Play / pause |
+| O | Options drawer |
+| Esc | Close drawer |
+| F | Fullscreen |
+| S | Snapshot |
+
+## Current product snapshot (for the next AI / human)
+
+As of the Musician Options Drawer work:
+
+- Flagship world is **Flow** (spectrum terrain + sky), not Album Pulse
+- Options live in a right-side accordion drawer; main chrome stays minimal
+- Compare is **true scissor split** on one WebGL canvas with dual analysers (`CompareTrack`)
+- Intensity scales displace + camera pull in Flow / Terrain
+- Docs of record: this README + [`docs/PROJECT.md`](docs/PROJECT.md)

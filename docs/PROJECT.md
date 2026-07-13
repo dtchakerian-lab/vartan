@@ -19,11 +19,14 @@ limits, logins, or installs**.
   may call a rate-limited service.
 - The only network call allowed is the **iTunes Search API** for cover art,
   and it must **fail silently** (never an error UI, never blocks anything).
-- Must work **offline after first load** for everything except iTunes art.
-- Must run from a **GitHub Pages project site**: all asset paths respect
-  Vite `base: '/vartan/'` (see `vite.config.ts`).
+  (Cover-art helpers may still exist in the repo; they are not on the critical
+  live path for the current UI.)
+- Must work **offline after first load** for everything except optional iTunes art.
+- Must run from a **GitHub Pages project site** (see `vite.config.ts` base).
 - Audio never leaves the device. Mic input is never recorded or uploaded.
 - No login walls, no analytics, no cookies.
+- **No YouTube / remote URL → MP3 conversion** in-app (static hosting + ToS).
+- **No settings persistence** for now (options are session-only; no localStorage).
 
 ## 3. Explicitly out of scope (do not add)
 
@@ -32,7 +35,11 @@ limits, logins, or installs**.
 - Screen-capture audio (Chromium-only, flaky)
 - Chrome extension packaging
 - Accounts, saved projects, cloud sync
-- Settings panels with dozens of sliders — the UI stays minimal
+- Bloated settings with dozens of unrelated sliders
+
+**Allowed:** a single **focused Options drawer** (accordion sections) for
+musician tools — Track info, Display, Practice, Compare. Keep the live canvas
+chrome minimal; put power features behind the gear (`O`).
 
 ## 4. Architecture
 
@@ -42,19 +49,20 @@ flowchart TB
     FileUpload[FileUpload]
     MicInput[MicInput]
     DemoSynth[DemoSynth]
-    ImageDrop[ImageDrop]
+    TrackB[CompareTrackB]
   end
 
   subgraph audio [AudioLayer]
     AudioEngine[AudioEngine]
+    CompareTrack[CompareTrack]
     BeatDetector[BeatDetector]
+    AudioDynamics[AudioDynamics]
+    Metronome[Metronome]
   end
 
   subgraph analysis [AnalysisOncePerTrack]
     SongAnalyzer[SongAnalyzer]
     MetadataParser[MetadataParser]
-    iTunesArt[iTunesArtFallback]
-    Poster[PosterGenerator]
   end
 
   subgraph render [RenderLayer]
@@ -66,176 +74,191 @@ flowchart TB
   FileUpload --> AudioEngine
   MicInput --> AudioEngine
   DemoSynth --> AudioEngine
+  TrackB --> CompareTrack
   FileUpload --> SongAnalyzer
   FileUpload --> MetadataParser
-  MetadataParser --> iTunesArt
-  iTunesArt --> Poster
+  AudioEngine --> AudioDynamics
   AudioEngine --> BeatDetector
+  CompareTrack --> AudioDynamics
   AudioEngine --> VisualManager
+  CompareTrack --> VisualManager
   SongAnalyzer --> VisualManager
+  Metronome --> Speakers[SpeakersOnly]
   VisualManager --> Worlds
   VisualManager -.webgl unavailable.-> Fallback2D
 ```
 
 Data flow every frame (60fps):
-`AudioEngine.getFrame()` → smoothed bass/mid/treble/volume + raw spectrum →
-`BeatDetector.update()` → beat envelope → `VisualParams` → active world's
-`update()` → render.
+`AudioEngine.getFrame()` → `AudioDynamics` (AGC + hits + section) →
+`BeatDetector` → `VisualParams` (+ intensity scales) → active world `update()` →
+render. When Compare split is on, `CompareTrack.getFrame()` drives the right half
+via `VisualManager.renderSplit` (scissor + dual spectrum/history lanes).
 
 Data flow once per file:
-decode → `analyzeBuffer()` (OfflineAudioContext DSP) → `SongFingerprint` →
-`deriveStyle()` (palette + speed) + `matchWorld()` (auto style pick).
+decode → `analyzeBuffer()` → `SongFingerprint` → `deriveStyle()` (palette + speed).
+BPM is shown in the UI (pill + Track info). World selection is **manual** via chips
+(default **Flow**).
 
 ## 5. Module map
 
 | Path | Responsibility |
 |---|---|
 | `src/main.ts` | Entry: instantiate `App` |
-| `src/app.ts` | Orchestrator: state, UI wiring, rAF loop |
-| `src/audio/AudioEngine.ts` | AudioContext, analyser chain, file/mic playback, record tap |
+| `src/app.ts` | Orchestrator: state, Options drawer, rAF loop, A–B loop, compare wiring |
+| `src/audio/AudioEngine.ts` | AudioContext, analyser chain, file/mic playback, monitor + record gains |
+| `src/audio/CompareTrack.ts` | Second file player + analyser for A\|B compare; Hear A/B/Mix |
+| `src/audio/Metronome.ts` | Scheduled clicks from BPM (destination only — not analyser) |
 | `src/audio/BeatDetector.ts` | Bass-onset beat envelope (0..1 decaying) |
-| `src/audio/DemoSynth.ts` | Procedural 120 BPM demo beat (no audio files needed) |
+| `src/audio/AudioDynamics.ts` | AGC bands, hits, liveEnergy, sectionPulse, hueShift |
+| `src/audio/DemoSynth.ts` | Procedural 120 BPM demo beat |
 | `src/audio/types.ts` | `AudioFrameMetrics`, `SongFingerprint`, defaults |
-| `src/analysis/SongAnalyzer.ts` | Offline BPM/energy/bassRatio/brightness via OfflineAudioContext |
-| `src/analysis/fingerprint.ts` | Fingerprint → palette (`deriveStyle`) + world pick (`matchWorld`) |
-| `src/visuals/VisualManager.ts` | Renderer, spectrum/history DataTextures, world registry |
-| `src/visuals/VisualParams.ts` | `VisualParams`, world IDs/labels, shared uniform helpers |
+| `src/analysis/SongAnalyzer.ts` | Offline BPM/energy/bassRatio/brightness |
+| `src/analysis/fingerprint.ts` | Fingerprint → palette (`deriveStyle`) |
+| `src/visuals/VisualManager.ts` | Renderer, dual texture lanes, world registry, split scissor render |
+| `src/visuals/VisualParams.ts` | `VisualParams`, intensity scales, world IDs/labels, uniforms |
 | `src/visuals/VisualWorld.ts` | Base class + fullscreen-triangle helper |
 | `src/visuals/glsl.ts` | Shared GLSL noise/uniform chunks |
-| `src/visuals/worlds/*.ts` | The six worlds (see below) |
+| `src/visuals/worlds/*.ts` | The six shipped worlds (see below) |
 | `src/visuals/Fallback2D.ts` | Canvas2D radial spectrum when WebGL fails |
-| `src/metadata/MetadataParser.ts` | ID3 via `music-metadata` (dynamic import, never throws) |
-| `src/metadata/iTunesArt.ts` | iTunes Search cover fetch, resolves `null` on any failure |
-| `src/metadata/poster.ts` | Palette-driven generated poster (canvas) |
+| `src/metadata/*` | ID3 / iTunes / poster helpers (optional; not required for live UI) |
 | `src/export/snapshot.ts` | PNG download of current frame |
 | `src/export/recorder.ts` | MediaRecorder canvas+audio clips, 30s hard cap |
-| `src/ui/styles.css` | All styling; dark theme, CSS variables in `:root` |
+| `src/ui/styles.css` | Styling including drawer, meters, split labels |
 
 ## 6. Core contracts
 
 ```ts
-// Per-frame (from AudioEngine.getFrame + BeatDetector)
 interface AudioFrameMetrics {
-  bass: number;      // 0..1, smoothed (fast attack, slow release)
+  bass: number;
   mid: number;
   treble: number;
   volume: number;
-  beat: number;      // spike to 1 on beat, exp decay
+  beat: number;
   spectrum: Uint8Array;
 }
 
-// Once per file (SongAnalyzer). Mic/demo use DEFAULT_FINGERPRINT variants.
 interface SongFingerprint {
   bpm: number;             // 60..190
   energy: number;          // 0..1
-  bassRatio: number;       // 0..1 low-band share
-  brightness: number;      // 0..1 high-band share
+  bassRatio: number;       // 0..1
+  brightness: number;      // 0..1
   beatRegularity: number;  // 0..1
   genreHint?: string;
 }
 
-// What every world receives every frame (VisualParams.ts)
 interface VisualParams {
   time, dt,
-  bass, mid, treble, volume, beat,   // live
-  energy, brightness, speed,          // fingerprint-derived
-  colorA, colorB, colorC              // THREE.Color palette
+  bass, mid, treble, volume, beat,
+  bassHit, midHit, trebleHit,
+  liveEnergy, sectionPulse, liveSpeed,
+  energy, brightness, speed,
+  colorA, colorB, colorC,
+  displaceScale,   // from view intensity
+  cameraPull       // from view intensity
 }
+
+type ViewIntensity = 'calm' | 'normal' | 'intense';
+// calm:   displace 0.55, cameraPull 0.25
+// normal: 1.0 / 1.0
+// intense: 1.25 / 1.15
 ```
 
-Shared shader uniforms (see `createSharedUniforms`): `uTime, uBass, uMid,
-uTreble, uVolume, uBeat, uEnergy, uSpeed, uAspect, uColorA/B/C, uSpectrum`.
-`uSpectrum` is a 64x1 `RedFormat` DataTexture; `WaveWorld` additionally uses
-a 64x64 scrolling history texture (`uHistory` + `uHistRow`).
+Shared uniforms include `uDisplaceScale`. Flow + Terrain apply displace in the
+vertex shader and scale camera approach with `cameraPull`.
+
+Spectrum textures: 64×1 `RedFormat`; history: 64×64 scrolling (`uHistory` +
+`uHistRow`). Compare uses a second lane for Track B.
 
 ## 7. Visual worlds
 
 | ID | Label | Type | Key audio drivers |
 |---|---|---|---|
-| `aurora` | Aurora | Fullscreen shader (fbm curtains) | bass → bloom, treble → shimmer/stars |
-| `particles` | Galaxy | 6000-point shader cloud | beat → outward impulse, treble → size, bass → camera push |
-| `kaleidoscope` | Prism | Fullscreen shader (radial fold) | mid → segments, beat → zoom, spectrum → radius rings |
-| `waves` | Terrain | Displaced plane over history tex | bass → peak height, beat → center ripple |
-| `tunnel` | Neon | Fullscreen shader (polar fly) | BPM/speed → fly rate, bass → ring pulse, spectrum → wall struts |
-| `album` | Pulse | Art texture + warp shader | bass → zoom, beat → chromatic split, mid → warp |
+| `flow` | Flow | Terrain + sky (flagship) | spectrum history peaks, bass camera, hits |
+| `aurora` | Aurora | Fullscreen shader | bass bloom, treble shimmer |
+| `particles` | Galaxy | Point cloud | beat impulse, treble size |
+| `kaleidoscope` | Prism | Radial fold shader | mid segments, beat zoom |
+| `waves` | Terrain | History plane | bass peaks, beat ripple |
+| `tunnel` | Neon | Polar fly shader | speed, bass rings, spectrum |
+
+`AlbumWorld` may still exist as unused code; it is **not** in `WORLD_IDS`.
 
 Rules for worlds:
 - Bass hits must be *felt* (pulse/bloom/shake), not just wiggle.
 - Every world consumes the palette so different songs look different.
 - New worlds: extend `VisualWorld`, register in `VisualManager.createWorld`,
-  add ID to `WORLD_IDS`/`WORLD_LABELS`. Nothing else should need changes.
+  add ID to `WORLD_IDS`/`WORLD_LABELS`.
 
-## 8. Palette + auto-match logic (fingerprint.ts)
+## 8. Palette (fingerprint.ts)
 
 - Hue: dark tracks (brightness < 0.45) → violet/indigo; bright → cyan→amber.
 - Saturation scales with energy; accent color is the complement.
 - Speed = 0.5 + bpmNorm * 0.9 + energy * 0.4 (range ~0.5..1.8).
-- `matchWorld`: art present → `album`; low energy + slow → `aurora`;
-  bassRatio > 0.52 → `waves`; fast + energetic → `tunnel`/`particles`
-  (brightness splits); bright → `kaleidoscope`; default `particles`.
-- Auto-match only applies while the user hasn't manually picked a world
-  (`userPickedWorld` flag) and the Auto-match checkbox is on.
+- Live colors also shift via `deriveLiveColors` (hue drift, hits, sections).
+- World pick is **manual** (chips). Default world: `flow`.
 
 ## 9. UI spec
 
 States: **hero** (drop/mic/demo) → **live** (canvas + controls). Controls
 auto-fade after 3.5s idle; pointer/touch wakes them.
 
+**Options drawer** (gear / `O`, Esc / backdrop closes):
+- Track info: BPM, energy, bass, brightness, tap-tempo
+- Display: intensity, meters, Clean UI (floating gear remains)
+- Practice: A–B loop, metronome, tap tempo
+- Compare (file only): load Track B, Split view, Hear A/B/Mix
+
+BPM pill in the top bar (file/demo) opens Track info.
+
 Exact user-facing copy for failure states:
 - Mic denied: `Microphone blocked — drop an audio file instead.`
 - Bad audio file: `Couldn't read that file — try an MP3, WAV, or M4A.`
 - Recording unsupported: `Recording isn't supported in this browser.`
-- Image before song: `Load a song first, then drop artwork.`
 
-Keyboard: Space = play/pause, F = fullscreen, S = snapshot.
+Keyboard: Space = play/pause, O = options, Esc = close drawer, F = fullscreen,
+S = snapshot.
 
 Never show raw errors, stack traces, or HTTP status codes to the user.
 
 Audio unlock: all sources start from user gestures; if the context is still
-suspended, a full-screen `Tap to start` overlay appears (required by browser
-autoplay policies, especially iOS Safari).
+suspended, a full-screen `Tap to start` overlay appears.
 
-## 10. Artwork resolution order (Album Pulse)
+## 10. Compare (A|B split)
 
-1. Embedded ID3 picture (via `music-metadata` `parseBlob`)
-2. iTunes Search API (`itunes.apple.com/search`, 6s timeout, silent fail;
-   art URL upgraded `100x100` → `600x600`; images loaded `crossOrigin`
-   anonymous — if CORS blocks texture use, we skip, we don't error)
-3. Generated poster (`poster.ts`): palette gradient + track initial + title
-
-An image file dropped by the user at any time overrides everything.
+- Track A = `AudioEngine` (file). Track B = `CompareTrack` sharing the same
+  `AudioContext`.
+- Split: `VisualManager.renderSplit` with scissor/viewport halves; same world
+  on both sides; CSS divider + A/B labels.
+- Hear modes duck Track A monitor/record gain and Track B gain
+  (A / B / Mix ≈ 0.55).
+- Play/pause/seek sync both clocks. Disabled for mic/demo.
+- Snapshot/record still use the single canvas (+ audio record tap).
 
 ## 11. Analysis implementation note
 
-The plan originally named essentia.js. The shipped implementation uses
-**dependency-free DSP** instead (OfflineAudioContext band-filter renders +
-onset autocorrelation in `SongAnalyzer.ts`): smaller bundle, no WASM loading,
-same fingerprint fields, guarded by a 10s timeout falling back to
-`DEFAULT_FINGERPRINT`. If BPM accuracy ever becomes a problem, essentia.js
-can be swapped in behind `analyzeBuffer()` without touching anything else.
+Dependency-free DSP (`SongAnalyzer.ts`): OfflineAudioContext band-filter
+renders + onset autocorrelation. 10s timeout → `DEFAULT_FINGERPRINT`.
 
 ## 12. Build & deploy
 
-- `npm run dev` → Vite dev server at `http://localhost:5173/`
-- `npm run build` → `tsc` typecheck + Vite build to `dist/`
-- Deploy: push to `main` → `.github/workflows/deploy.yml` builds and
-  publishes to GitHub Pages (Settings → Pages → Source: **GitHub Actions**).
-- URL: `https://<username>.github.io/vartan/`
-- `vite.config.ts` uses `base: './'` (relative asset paths for GitHub Pages project sites).
+- `npm run dev` → Vite dev server
+- `npm run build` → `tsc` + Vite → `dist/`
+- Deploy: push to `main` → GitHub Pages workflow / `gh-pages` (see README)
+- `vite.config.ts` uses relative `base` for project Pages sites
 
 ## 13. Testing checklist (run before sharing the link)
 
-- [ ] Slow ballad → slow drift, muted palette
-- [ ] Bass-heavy EDM → strong pulses, fast motion, hotter palette
-- [ ] Chaotic/live recording → no crash, irregular bursts
+- [ ] Slow ballad → calm motion, muted palette
+- [ ] Bass-heavy track → Flow Intense zooms; **Calm** pulls camera back / lowers peaks
+- [ ] BPM pill matches analysis; Track info labels update
+- [ ] Meters toggle; Clean UI hides chrome; floating gear still opens Options
+- [ ] A–B loop wraps during play; Clear restores normal seek
+- [ ] Metronome clicks while playing; tap tempo updates Track info + metro
+- [ ] Compare: load B → Split → left=A right=B; Hear A/B/Mix; eject clears B
+- [ ] Compare disabled / hinted on mic and demo
 - [ ] All six worlds switchable live during playback
-- [ ] Auto-match toggle changes the starting world per track
-- [ ] MP3 with embedded art → Pulse shows real cover
-- [ ] MP3 without art, known artist → iTunes art or silent poster fallback
-- [ ] Manual image drop → Pulse mode with that image
 - [ ] Mic works; denying mic shows the friendly hint
 - [ ] Demo beat works with no file and no mic
 - [ ] Snapshot downloads a PNG; Record stops at 30s and downloads
 - [ ] Fullscreen + controls auto-fade
 - [ ] iPad/Safari: tap-to-start overlay unlocks audio
-- [ ] `npm run build` passes; site works at the `/vartan/` path
+- [ ] `npm run build` passes; site works at the project Pages path

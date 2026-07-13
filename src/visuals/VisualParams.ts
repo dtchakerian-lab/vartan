@@ -26,6 +26,23 @@ export const WORLD_LABELS: Record<WorldId, string> = {
   tunnel: 'Neon',
 };
 
+export type ViewIntensity = 'calm' | 'normal' | 'intense';
+
+/** Displace + camera approach multipliers from intensity preset. */
+export function intensityScales(level: ViewIntensity): {
+  displaceScale: number;
+  cameraPull: number;
+} {
+  switch (level) {
+    case 'calm':
+      return { displaceScale: 0.55, cameraPull: 0.25 };
+    case 'intense':
+      return { displaceScale: 1.25, cameraPull: 1.15 };
+    default:
+      return { displaceScale: 1, cameraPull: 1 };
+  }
+}
+
 /** Everything a world receives every frame. */
 export interface VisualParams {
   time: number;
@@ -54,6 +71,10 @@ export interface VisualParams {
   colorA: THREE.Color;
   colorB: THREE.Color;
   colorC: THREE.Color;
+  /** Terrain / peak height scale (intensity). */
+  displaceScale: number;
+  /** How hard bass pulls the camera in (intensity). */
+  cameraPull: number;
 }
 
 /** Uniforms every shader world shares. Worlds may add their own. */
@@ -78,6 +99,7 @@ export function createSharedUniforms(): Record<string, THREE.IUniform> {
     uColorB: { value: new THREE.Color(0x220a66) },
     uColorC: { value: new THREE.Color(0x22ddcc) },
     uSpectrum: { value: null as THREE.DataTexture | null },
+    uDisplaceScale: { value: 1 },
   };
 }
 
@@ -106,6 +128,7 @@ export function updateSharedUniforms(
   (u.uColorB.value as THREE.Color).copy(p.colorB);
   (u.uColorC.value as THREE.Color).copy(p.colorC);
   u.uSpectrum.value = spectrumTex;
+  if (u.uDisplaceScale) u.uDisplaceScale.value = p.displaceScale;
 }
 
 /** Shift palette live: hue travel + section jolts + hit flashes. */

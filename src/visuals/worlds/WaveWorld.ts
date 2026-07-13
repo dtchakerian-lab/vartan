@@ -17,6 +17,7 @@ uniform float uBeat;
 uniform float uBassHit;
 uniform float uMidHit;
 uniform float uLiveEnergy;
+uniform float uDisplaceScale;
 varying vec2 vUv;
 varying float vHeight;
 
@@ -33,7 +34,8 @@ void main() {
 
   vHeight = h;
   vec3 pos = position;
-  pos.z = (h * h * 3.6 + h * 0.65) * (1.0 + uBass * 1.6 + uLiveEnergy * 0.8) + ripple;
+  pos.z = ((h * h * 3.6 + h * 0.65) * (1.0 + uBass * 1.6 + uLiveEnergy * 0.8) + ripple)
+    * uDisplaceScale;
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
@@ -107,10 +109,11 @@ export class WaveWorld extends VisualWorld {
     this.material.uniforms.uHistory.value = ctx.historyTex;
 
     // Camera: low over the terrain, bass bob, gentle sway.
+    const z = 3.2 + (1 - p.cameraPull) * 1.6;
     this.camera.position.set(
       Math.sin(p.time * 0.2) * 0.6,
-      1.35 + p.bass * 0.35 + p.beat * 0.15,
-      3.2,
+      1.35 + (p.bass * 0.35 + p.beat * 0.15) * p.cameraPull,
+      z,
     );
     this.camera.lookAt(0, 0.4, -6);
   }

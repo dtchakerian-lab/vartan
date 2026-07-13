@@ -15,6 +15,7 @@ export class AudioEngine {
   private readonly sourceBus: GainNode;
   private readonly micGain: GainNode;
   private readonly monitorGain: GainNode;
+  private readonly recordGain: GainNode;
   readonly recordDest: MediaStreamAudioDestinationNode;
 
   /** 1..6 — mic-only pre-amp before the analyser. */
@@ -54,12 +55,14 @@ export class AudioEngine {
     this.micGain.gain.value = 1;
     this.micGain.connect(this.sourceBus);
     this.monitorGain = this.ctx.createGain();
+    this.recordGain = this.ctx.createGain();
     this.recordDest = this.ctx.createMediaStreamDestination();
 
     this.sourceBus.connect(this.analyser);
     this.analyser.connect(this.monitorGain);
     this.monitorGain.connect(this.ctx.destination);
-    this.sourceBus.connect(this.recordDest);
+    this.sourceBus.connect(this.recordGain);
+    this.recordGain.connect(this.recordDest);
 
     this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
   }
@@ -79,6 +82,13 @@ export class AudioEngine {
     return this.ctx.state === 'running';
   }
 
+  /** Duck / restore Track A speakers + record tap (used by A|B hear modes). */
+  setMonitorLevel(level: number): void {
+    const v = Math.max(0, Math.min(1, level));
+    this.monitorGain.gain.value = v;
+    this.recordGain.gain.value = v;
+  }
+
   /** Node other sources (e.g. the demo synth) should connect into. */
   get inputNode(): AudioNode {
     return this.sourceBus;
@@ -91,7 +101,7 @@ export class AudioEngine {
     this.buffer = buffer;
     this.mode = 'file';
     this.pausedAt = 0;
-    this.monitorGain.gain.value = 1;
+    this.setMonitorLevel(1);
     return buffer;
   }
 
@@ -166,7 +176,7 @@ export class AudioEngine {
     this.micSource.connect(this.micGain);
     this.micGain.gain.value = this.micBoost;
     this.analyser.smoothingTimeConstant = 0.3;
-    this.monitorGain.gain.value = 0; // no speaker output -> no feedback
+    this.setMonitorLevel(0); // no speaker output -> no feedback
     this.mode = 'mic';
     this.playing = true;
     await this.unlock();
@@ -176,7 +186,7 @@ export class AudioEngine {
   beginExternal(mode: AudioSourceMode): void {
     this.stopAll();
     this.mode = mode;
-    this.monitorGain.gain.value = 1;
+    this.setMonitorLevel(1);
     this.playing = true;
   }
 

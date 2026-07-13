@@ -11,8 +11,16 @@ import { TunnelWorld } from './worlds/TunnelWorld';
 const SPECTRUM_BINS = 64;
 const HISTORY_ROWS = 64;
 
+interface TextureLane {
+  spectrumTex: THREE.DataTexture;
+  spectrumData: Uint8Array;
+  historyTex: THREE.DataTexture;
+  historyData: Uint8Array;
+  historyRow: number;
+}
+
 /**
- * Owns the WebGL renderer, shared spectrum/history textures,
+ * Owns the WebGL renderer, spectrum/history textures (A + B for compare),
  * and the registry of lazily-created worlds.
  */
 export class VisualManager {
@@ -23,11 +31,9 @@ export class VisualManager {
   private activeId: WorldId = 'flow';
   private ctx: WorldContext;
 
-  private spectrumTex: THREE.DataTexture;
-  private spectrumData: Uint8Array;
-  private historyTex: THREE.DataTexture;
-  private historyData: Uint8Array;
-  private historyRow = 0;
+  private laneA: TextureLane;
+  private laneB: TextureLane;
+  private split = false;
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -39,36 +45,16 @@ export class VisualManager {
     this.canvas = this.renderer.domElement;
     container.appendChild(this.canvas);
 
-    this.spectrumData = new Uint8Array(SPECTRUM_BINS);
-    this.spectrumTex = new THREE.DataTexture(
-      this.spectrumData,
-      SPECTRUM_BINS,
-      1,
-      THREE.RedFormat,
-      THREE.UnsignedByteType,
-    );
-    this.spectrumTex.magFilter = THREE.LinearFilter;
-    this.spectrumTex.minFilter = THREE.LinearFilter;
-
-    this.historyData = new Uint8Array(SPECTRUM_BINS * HISTORY_ROWS);
-    this.historyTex = new THREE.DataTexture(
-      this.historyData,
-      SPECTRUM_BINS,
-      HISTORY_ROWS,
-      THREE.RedFormat,
-      THREE.UnsignedByteType,
-    );
-    this.historyTex.magFilter = THREE.LinearFilter;
-    this.historyTex.minFilter = THREE.LinearFilter;
-    this.historyTex.wrapT = THREE.RepeatWrapping;
+    this.laneA = createLane();
+    this.laneB = createLane();
 
     this.ctx = {
       renderer: this.renderer,
       width: 1,
       height: 1,
-      spectrumTex: this.spectrumTex,
-      historyTex: this.historyTex,
-      getHistoryRow: () => this.historyRow / HISTORY_ROWS,
+      spectrumTex: this.laneA.spectrumTex,
+      historyTex: this.laneA.historyTex,
+      getHistoryRow: () => this.laneA.historyRow / HISTORY_ROWS,
     };
 
     this.resize();
@@ -120,26 +106,78 @@ export class VisualManager {
     return this.activeId;
   }
 
-  private updateTextures(spectrum: Uint8Array): void {
+  setSplit(on: boolean): void {
+    this.split = on;
+    if (!on) {
+      this.renderer.setScissorTest(false);
+      this.renderer.setViewport(0, 0, this.ctx.width, this.ctx.height);
+      const world = this.getWorld(this.activeId);
+      world.resize(this.ctx.width, this.ctx.height);
+    }
+  }
+
+  private updateLane(lane: TextureLane, spectrum: Uint8Array): void {
     const usable = Math.floor(spectrum.length * 0.5);
     const group = Math.max(1, Math.floor(usable / SPECTRUM_BINS));
     for (let i = 0; i < SPECTRUM_BINS; i++) {
       let sum = 0;
       const base = i * group;
       for (let j = 0; j < group; j++) sum += spectrum[base + j];
-      this.spectrumData[i] = sum / group;
+      lane.spectrumData[i] = sum / group;
     }
-    this.spectrumTex.needsUpdate = true;
+    lane.spectrumTex.needsUpdate = true;
 
-    this.historyRow = (this.historyRow + 1) % HISTORY_ROWS;
-    this.historyData.set(this.spectrumData, this.historyRow * SPECTRUM_BINS);
-    this.historyTex.needsUpdate = true;
+    lane.historyRow = (lane.historyRow + 1) % HISTORY_ROWS;
+    lane.historyData.set(lane.spectrumData, lane.historyRow * SPECTRUM_BINS);
+    lane.historyTex.needsUpdate = true;
+  }
+
+  private bindLane(lane: TextureLane): void {
+    this.ctx.spectrumTex = lane.spectrumTex;
+    this.ctx.historyTex = lane.historyTex;
+    this.ctx.getHistoryRow = () => lane.historyRow / HISTORY_ROWS;
   }
 
   render(p: VisualParams, spectrum: Uint8Array): void {
-    this.updateTextures(spectrum);
+    this.updateLane(this.laneA, spectrum);
+    this.bindLane(this.laneA);
     const world = this.getWorld(this.activeId);
+    this.renderer.setScissorTest(false);
+    this.renderer.setViewport(0, 0, this.ctx.width, this.ctx.height);
+    world.resize(this.ctx.width, this.ctx.height);
     world.update(p, this.ctx);
+    this.renderer.render(world.scene, world.camera);
+  }
+
+  renderSplit(
+    paramsA: VisualParams,
+    spectrumA: Uint8Array,
+    paramsB: VisualParams,
+    spectrumB: Uint8Array,
+  ): void {
+    const w = this.ctx.width;
+    const h = this.ctx.height;
+    const half = Math.floor(w / 2);
+    const world = this.getWorld(this.activeId);
+
+    this.renderer.setScissorTest(true);
+
+    // Left = Track A
+    this.updateLane(this.laneA, spectrumA);
+    this.bindLane(this.laneA);
+    this.renderer.setViewport(0, 0, half, h);
+    this.renderer.setScissor(0, 0, half, h);
+    world.resize(half, h);
+    world.update(paramsA, this.ctx);
+    this.renderer.render(world.scene, world.camera);
+
+    // Right = Track B
+    this.updateLane(this.laneB, spectrumB);
+    this.bindLane(this.laneB);
+    this.renderer.setViewport(half, 0, w - half, h);
+    this.renderer.setScissor(half, 0, w - half, h);
+    world.resize(w - half, h);
+    world.update(paramsB, this.ctx);
     this.renderer.render(world.scene, world.camera);
   }
 
@@ -149,12 +187,48 @@ export class VisualManager {
     this.ctx.width = w;
     this.ctx.height = h;
     this.renderer.setSize(w, h);
-    for (const world of this.worlds.values()) world.resize(w, h);
+    if (!this.split) {
+      for (const world of this.worlds.values()) world.resize(w, h);
+    }
   }
 
   dispose(): void {
     for (const world of this.worlds.values()) world.dispose();
     this.worlds.clear();
+    disposeLane(this.laneA);
+    disposeLane(this.laneB);
     this.renderer.dispose();
   }
+}
+
+function createLane(): TextureLane {
+  const spectrumData = new Uint8Array(SPECTRUM_BINS);
+  const spectrumTex = new THREE.DataTexture(
+    spectrumData,
+    SPECTRUM_BINS,
+    1,
+    THREE.RedFormat,
+    THREE.UnsignedByteType,
+  );
+  spectrumTex.magFilter = THREE.LinearFilter;
+  spectrumTex.minFilter = THREE.LinearFilter;
+
+  const historyData = new Uint8Array(SPECTRUM_BINS * HISTORY_ROWS);
+  const historyTex = new THREE.DataTexture(
+    historyData,
+    SPECTRUM_BINS,
+    HISTORY_ROWS,
+    THREE.RedFormat,
+    THREE.UnsignedByteType,
+  );
+  historyTex.magFilter = THREE.LinearFilter;
+  historyTex.minFilter = THREE.LinearFilter;
+  historyTex.wrapT = THREE.RepeatWrapping;
+
+  return { spectrumTex, spectrumData, historyTex, historyData, historyRow: 0 };
+}
+
+function disposeLane(lane: TextureLane): void {
+  lane.spectrumTex.dispose();
+  lane.historyTex.dispose();
 }
