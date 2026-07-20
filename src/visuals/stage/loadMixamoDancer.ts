@@ -35,8 +35,8 @@ export async function loadMixamoDancer(baseUrl = './stage/'): Promise<MixamoDanc
   const root = character.scene;
   root.name = 'mixamoDancer';
 
-  // Mixamo units → meters-ish; sit on stage
-  root.scale.setScalar(0.01);
+  // This GLB is already ~meter scale (hips ~0.96m). Do NOT apply Mixamo's old 0.01 cm→m scale.
+  root.scale.setScalar(1);
   root.position.set(0, 0, 0);
   root.rotation.y = Math.PI; // face camera
 
@@ -93,11 +93,11 @@ function styleCharacter(root: THREE.Object3D): void {
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const mat of mats) {
       if (!(mat instanceof THREE.MeshStandardMaterial)) continue;
-      mat.color.multiplyScalar(0.28);
-      mat.metalness = Math.min(1, mat.metalness + 0.25);
-      mat.roughness = Math.max(0.45, mat.roughness * 0.9);
-      mat.emissive = new THREE.Color(0x050508);
-      mat.envMapIntensity = 0.4;
+      mat.color.multiplyScalar(0.55);
+      mat.metalness = Math.min(1, mat.metalness + 0.15);
+      mat.roughness = Math.max(0.4, mat.roughness * 0.85);
+      mat.emissive = new THREE.Color(0x0a0814);
+      mat.envMapIntensity = 0.5;
       mat.needsUpdate = true;
     }
   });

@@ -214,7 +214,7 @@ export class StageWorld extends VisualWorld {
   private async bootDancer(): Promise<void> {
     const token = ++this.loadToken;
     try {
-      const mixamo = await loadMixamoDancer('./stage/');
+      const mixamo = await loadMixamoDancer(`${import.meta.env.BASE_URL}stage/`);
       if (token !== this.loadToken) {
         mixamo.dispose();
         return;
@@ -245,9 +245,9 @@ export class StageWorld extends VisualWorld {
   private leashHips(): void {
     const hips = this.dancer?.hips;
     if (!hips || !this.usingMixamo) return;
-    // Mixamo hip translation is in cm-ish units before root scale
-    hips.position.x = THREE.MathUtils.clamp(hips.position.x, -55, 55);
-    hips.position.z = THREE.MathUtils.clamp(hips.position.z, -45, 45);
+    // Meter-scale Mixamo: small leash so they don't walk off the platform
+    hips.position.x = THREE.MathUtils.clamp(hips.position.x, -0.7, 0.7);
+    hips.position.z = THREE.MathUtils.clamp(hips.position.z, -0.55, 0.55);
   }
 
   private playLoop(name: MoodPackId): void {
