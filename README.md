@@ -33,8 +33,8 @@ Also ensure **Settings → Actions → General → Workflow permissions** is set
 ## Features
 
 - Audio file upload (MP3/WAV/M4A/OGG), microphone, or built-in demo beat
-- Seven visual worlds: **Stage** (hooded 3D dancer — default), Flow, Aurora, Galaxy, Prism, Terrain, Neon
-- Offline song fingerprint (BPM, energy, bass, brightness) drives palette + motion (and Stage mood packs)
+- Seven visual worlds: **Stage** (Mixamo dancer auto-matched to the song — default), Flow, Aurora, Galaxy, Prism, Terrain, Neon
+- Offline song fingerprint (BPM, energy, bass, brightness) drives palette + motion (and Stage mood packs mid-song)
 - **Options drawer** (gear / `O`): musician tools without cluttering the canvas
   - **Track info** — BPM pill + energy/bass/brightness readout; tap-tempo result
   - **Display** — intensity Calm / Normal / Intense (fixes over-zoom on Flow/Terrain); band meters; Clean UI

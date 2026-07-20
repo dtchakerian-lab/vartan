@@ -189,9 +189,10 @@ Spectrum textures: 64×1 `RedFormat`; history: 64×64 scrolling (`uHistory` +
 
 `AlbumWorld` may still exist as unused code; it is **not** in `WORLD_IDS`.
 
-**Stage** is isolated: procedural hooded silhouette (no celebrity likeness). Mood packs
-from fingerprint (`sway` / `groove` / `bounce` / `stomp`); accents on bass/mid hits.
-Optional Mixamo GLB swap documented in `public/stage/README.md`.
+**Stage** is isolated: Mixamo dancer (dark stage styling) with real dance clips.
+Mood packs auto-picked from fingerprint and can shift mid-song from live energy /
+section pulses / hits — no user style menu. Accents fire on beats. Procedural
+hooded figure is fallback if assets fail. See `public/stage/README.md`.
 
 Rules for worlds:
 - Bass hits must be *felt* (pulse/bloom/shake), not just wiggle.

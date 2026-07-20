@@ -1,15 +1,21 @@
 # Stage assets
 
-Vartan ships a **procedural hooded dancer** (built in code) so Stage works offline with zero downloads.
+## Runtime (shipped)
 
-## Optional Mixamo swap
+- `character-the-boss.glb` — Mixamo character (dark-styled at runtime)
+- Dance clips (Mixamo, free for personal/dev use):
+  - `animation-rumba.glb` → sway
+  - `animation-hiphop.glb` → groove
+  - `animation-samba.glb` → bounce
+  - `animation-snake-hiphop.glb` → stomp
+  - `animation-tut-hiphop.glb` → hit accent
+  - `animation-silly-dancing.glb` → jump accent
+  - `animation-breakdance-uprock.glb` → headbang accent
 
-To replace with a Mixamo character later:
+Sources: Mixamo via community GLB conversions. Attribution not required by Mixamo; Quaternius/other packs are optional alternatives.
 
-1. Export a humanoid from [Mixamo](https://www.mixamo.com) as GLB (same skeleton for all clips).
-2. Include loops named or remapped to: `sway`, `groove`, `bounce`, `stomp`.
-3. Include accents: `hit`, `jump`, `headbang`.
-4. Place the file at `public/stage/dancer.glb`.
-5. Set `USE_EXTERNAL_GLB = true` in `src/visuals/worlds/StageWorld.ts`.
+## Behavior
 
-Mixamo animations are free for personal/dev use; keep attribution in project docs.
+Pack is chosen automatically from song fingerprint, then can shift mid-song from live energy / sections / hits. No user style clicks.
+
+Procedural hooded dancer remains a fallback if GLBs fail to load.
