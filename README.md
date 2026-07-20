@@ -33,8 +33,8 @@ Also ensure **Settings → Actions → General → Workflow permissions** is set
 ## Features
 
 - Audio file upload (MP3/WAV/M4A/OGG), microphone, or built-in demo beat
-- Six visual worlds: **Flow**, Aurora, Galaxy, Prism, Terrain, Neon
-- Offline song fingerprint (BPM, energy, bass, brightness) drives palette + motion
+- Seven visual worlds: **Stage** (hooded 3D dancer — default), Flow, Aurora, Galaxy, Prism, Terrain, Neon
+- Offline song fingerprint (BPM, energy, bass, brightness) drives palette + motion (and Stage mood packs)
 - **Options drawer** (gear / `O`): musician tools without cluttering the canvas
   - **Track info** — BPM pill + energy/bass/brightness readout; tap-tempo result
   - **Display** — intensity Calm / Normal / Intense (fixes over-zoom on Flow/Terrain); band meters; Clean UI
@@ -61,10 +61,11 @@ Also ensure **Settings → Actions → General → Workflow permissions** is set
 
 ## Current product snapshot (for the next AI / human)
 
-As of the Musician Options Drawer work:
+As of the Stage dancer work:
 
-- Flagship world is **Flow** (spectrum terrain + sky), not Album Pulse
+- Flagship / default world is **Stage** (isolated hooded 3D dancer + reactive lights)
+- Abstract worlds (Flow, etc.) are unchanged and still available via chips
 - Options live in a right-side accordion drawer; main chrome stays minimal
-- Compare is **true scissor split** on one WebGL canvas with dual analysers (`CompareTrack`)
-- Intensity scales displace + camera pull in Flow / Terrain
+- Compare: scissor split on shader worlds; on Stage, full-bleed dancer uses Track A (Hear A/B/Mix still works)
+- Intensity scales displace + camera pull in Flow / Terrain; Stage uses intensity for camera punch
 - Docs of record: this README + [`docs/PROJECT.md`](docs/PROJECT.md)

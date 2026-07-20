@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import type { VisualParams, WorldId } from './VisualParams';
 import type { VisualWorld, WorldContext } from './VisualWorld';
+import { StageWorld } from './worlds/StageWorld';
 import { FlowWorld } from './worlds/FlowWorld';
 import { AuroraWorld } from './worlds/AuroraWorld';
 import { ParticleWorld } from './worlds/ParticleWorld';
 import { KaleidoscopeWorld } from './worlds/KaleidoscopeWorld';
 import { WaveWorld } from './worlds/WaveWorld';
 import { TunnelWorld } from './worlds/TunnelWorld';
+import type { SongFingerprint } from '../audio/types';
 
 const SPECTRUM_BINS = 64;
 const HISTORY_ROWS = 64;
@@ -28,7 +30,7 @@ export class VisualManager {
   readonly canvas: HTMLCanvasElement;
 
   private worlds = new Map<WorldId, VisualWorld>();
-  private activeId: WorldId = 'flow';
+  private activeId: WorldId = 'stage';
   private ctx: WorldContext;
 
   private laneA: TextureLane;
@@ -58,12 +60,15 @@ export class VisualManager {
     };
 
     this.resize();
-    this.setWorld('flow');
+    this.setWorld('stage');
   }
 
   private createWorld(id: WorldId): VisualWorld {
     let world: VisualWorld;
     switch (id) {
+      case 'stage':
+        world = new StageWorld();
+        break;
       case 'flow':
         world = new FlowWorld();
         break;
@@ -86,6 +91,12 @@ export class VisualManager {
     world.init(this.ctx);
     world.resize(this.ctx.width, this.ctx.height);
     return world;
+  }
+
+  /** Push track fingerprint into Stage (mood pack). Ensures Stage exists. */
+  setStageFingerprint(fp: SongFingerprint): void {
+    const world = this.getWorld('stage');
+    if (world instanceof StageWorld) world.setFingerprint(fp);
   }
 
   private getWorld(id: WorldId): VisualWorld {

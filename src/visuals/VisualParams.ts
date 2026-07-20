@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 export type WorldId =
+  | 'stage'
   | 'flow'
   | 'aurora'
   | 'particles'
@@ -9,6 +10,7 @@ export type WorldId =
   | 'tunnel';
 
 export const WORLD_IDS: WorldId[] = [
+  'stage',
   'flow',
   'aurora',
   'particles',
@@ -18,6 +20,7 @@ export const WORLD_IDS: WorldId[] = [
 ];
 
 export const WORLD_LABELS: Record<WorldId, string> = {
+  stage: 'Stage',
   flow: 'Flow',
   aurora: 'Aurora',
   particles: 'Galaxy',
@@ -68,6 +71,10 @@ export interface VisualParams {
   energy: number;
   brightness: number;
   speed: number;
+  /** Fingerprint BPM (Stage dancer timeScale). */
+  bpm: number;
+  bassRatio: number;
+  genreHint?: string;
   colorA: THREE.Color;
   colorB: THREE.Color;
   colorC: THREE.Color;

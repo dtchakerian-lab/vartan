@@ -67,7 +67,8 @@ flowchart TB
 
   subgraph render [RenderLayer]
     VisualManager[VisualManager]
-    Worlds[SixWorlds]
+    Worlds[SevenWorlds]
+    Stage[StageDancer]
     Fallback2D[Fallback2D]
   end
 
@@ -97,7 +98,8 @@ via `VisualManager.renderSplit` (scissor + dual spectrum/history lanes).
 Data flow once per file:
 decode → `analyzeBuffer()` → `SongFingerprint` → `deriveStyle()` (palette + speed).
 BPM is shown in the UI (pill + Track info). World selection is **manual** via chips
-(default **Flow**).
+(default **Stage**). Stage is an isolated spectacle world (3D dancer); other worlds
+remain abstract shaders and must keep working unchanged.
 
 ## 5. Module map
 
@@ -117,8 +119,11 @@ BPM is shown in the UI (pill + Track info). World selection is **manual** via ch
 | `src/visuals/VisualManager.ts` | Renderer, dual texture lanes, world registry, split scissor render |
 | `src/visuals/VisualParams.ts` | `VisualParams`, intensity scales, world IDs/labels, uniforms |
 | `src/visuals/VisualWorld.ts` | Base class + fullscreen-triangle helper |
+| `src/visuals/stage/MoodPacks.ts` | Fingerprint → sway/groove/bounce/stomp pack |
+| `src/visuals/stage/DanceConductor.ts` | BPM timeScale + beat accents for Stage |
+| `src/visuals/stage/createDancer.ts` | Procedural hooded dancer + AnimationClips |
 | `src/visuals/glsl.ts` | Shared GLSL noise/uniform chunks |
-| `src/visuals/worlds/*.ts` | The six shipped worlds (see below) |
+| `src/visuals/worlds/*.ts` | The seven shipped worlds (see below) |
 | `src/visuals/Fallback2D.ts` | Canvas2D radial spectrum when WebGL fails |
 | `src/metadata/*` | ID3 / iTunes / poster helpers (optional; not required for live UI) |
 | `src/export/snapshot.ts` | PNG download of current frame |
@@ -152,6 +157,7 @@ interface VisualParams {
   bassHit, midHit, trebleHit,
   liveEnergy, sectionPulse, liveSpeed,
   energy, brightness, speed,
+  bpm, bassRatio, genreHint?,
   colorA, colorB, colorC,
   displaceScale,   // from view intensity
   cameraPull       // from view intensity
@@ -173,7 +179,8 @@ Spectrum textures: 64×1 `RedFormat`; history: 64×64 scrolling (`uHistory` +
 
 | ID | Label | Type | Key audio drivers |
 |---|---|---|---|
-| `flow` | Flow | Terrain + sky (flagship) | spectrum history peaks, bass camera, hits |
+| `stage` | Stage | 3D dancer (default) | mood pack, BPM timeScale, beat accents, lights |
+| `flow` | Flow | Terrain + sky | spectrum history peaks, bass camera, hits |
 | `aurora` | Aurora | Fullscreen shader | bass bloom, treble shimmer |
 | `particles` | Galaxy | Point cloud | beat impulse, treble size |
 | `kaleidoscope` | Prism | Radial fold shader | mid segments, beat zoom |
@@ -182,11 +189,16 @@ Spectrum textures: 64×1 `RedFormat`; history: 64×64 scrolling (`uHistory` +
 
 `AlbumWorld` may still exist as unused code; it is **not** in `WORLD_IDS`.
 
+**Stage** is isolated: procedural hooded silhouette (no celebrity likeness). Mood packs
+from fingerprint (`sway` / `groove` / `bounce` / `stomp`); accents on bass/mid hits.
+Optional Mixamo GLB swap documented in `public/stage/README.md`.
+
 Rules for worlds:
 - Bass hits must be *felt* (pulse/bloom/shake), not just wiggle.
 - Every world consumes the palette so different songs look different.
 - New worlds: extend `VisualWorld`, register in `VisualManager.createWorld`,
   add ID to `WORLD_IDS`/`WORLD_LABELS`.
+- Do not fold the dancer into shader worlds — Stage stays its own thing.
 
 ## 8. Palette (fingerprint.ts)
 
@@ -194,7 +206,7 @@ Rules for worlds:
 - Saturation scales with energy; accent color is the complement.
 - Speed = 0.5 + bpmNorm * 0.9 + energy * 0.4 (range ~0.5..1.8).
 - Live colors also shift via `deriveLiveColors` (hue drift, hits, sections).
-- World pick is **manual** (chips). Default world: `flow`.
+- World pick is **manual** (chips). Default world: `stage`.
 
 ## 9. UI spec
 
@@ -228,6 +240,10 @@ suspended, a full-screen `Tap to start` overlay appears.
   `AudioContext`.
 - Split: `VisualManager.renderSplit` with scissor/viewport halves; same world
   on both sides; CSS divider + A/B labels.
+- **Stage exception:** while Split is on and the active world is Stage, the canvas
+  stays full-bleed driven by **Track A** only (single dancer). Overlay label reads
+  “Stage uses Track A”. Hear A/B/Mix and Track B loading remain unchanged.
+  Switching to a shader world restores true A|B scissor split.
 - Hear modes duck Track A monitor/record gain and Track B gain
   (A / B / Mix ≈ 0.55).
 - Play/pause/seek sync both clocks. Disabled for mic/demo.
@@ -247,15 +263,19 @@ renders + onset autocorrelation. 10s timeout → `DEFAULT_FINGERPRINT`.
 
 ## 13. Testing checklist (run before sharing the link)
 
-- [ ] Slow ballad → calm motion, muted palette
+- [ ] Stage default on load: hooded dancer grooves; lights react to bass/beat
+- [ ] Ballad vs banger on Stage → different pack / intensity / hit timing
+- [ ] Stage ↔ Flow mid-song: no WebGL errors; audio continues
+- [ ] Slow ballad → calm motion, muted palette (shader worlds)
 - [ ] Bass-heavy track → Flow Intense zooms; **Calm** pulls camera back / lowers peaks
 - [ ] BPM pill matches analysis; Track info labels update
 - [ ] Meters toggle; Clean UI hides chrome; floating gear still opens Options
 - [ ] A–B loop wraps during play; Clear restores normal seek
 - [ ] Metronome clicks while playing; tap tempo updates Track info + metro
-- [ ] Compare: load B → Split → left=A right=B; Hear A/B/Mix; eject clears B
+- [ ] Compare: load B → Split → left=A right=B on Flow; Hear A/B/Mix; eject clears B
+- [ ] Compare on Stage: full-bleed dancer + “Stage uses Track A” hint; Hear still works
 - [ ] Compare disabled / hinted on mic and demo
-- [ ] All six worlds switchable live during playback
+- [ ] All seven worlds switchable live during playback
 - [ ] Mic works; denying mic shows the friendly hint
 - [ ] Demo beat works with no file and no mic
 - [ ] Snapshot downloads a PNG; Record stops at 30s and downloads

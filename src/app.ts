@@ -133,6 +133,7 @@ export class App {
     const stage = byId('stage');
     try {
       this.manager = new VisualManager(stage);
+      this.manager.setStageFingerprint(this.fingerprint);
     } catch {
       this.fallback = new Fallback2D(stage);
       this.el.chips.style.display = 'none';
@@ -176,7 +177,7 @@ export class App {
     this.enterLiveUi();
     this.trackLabel = file.name.replace(/\.[a-z0-9]+$/i, '');
     this.el.trackTitle.textContent = this.trackLabel;
-    this.showToast('Ready — pick a theme, then press play.');
+    this.showToast('Ready — Stage is live. Press play.');
     this.applyHearMode();
     this.refreshCompareAvailability();
 
@@ -196,6 +197,7 @@ export class App {
     this.style = deriveStyle(fp);
     this.syncMetroBpm();
     this.refreshTrackInfo();
+    this.manager?.setStageFingerprint(fp);
   }
 
   private async resolveMeta(file: File, token: number): Promise<void> {
@@ -207,7 +209,10 @@ export class App {
       this.el.trackTitle.textContent = this.trackLabel;
       this.refreshSplitLabels();
     }
-    if (meta.genreHint) this.fingerprint.genreHint = meta.genreHint;
+    if (meta.genreHint) {
+      this.fingerprint.genreHint = meta.genreHint;
+      this.manager?.setStageFingerprint(this.fingerprint);
+    }
   }
 
   private async useMic(): Promise<void> {
@@ -376,7 +381,9 @@ export class App {
   private setWorld(id: WorldId): void {
     if (!this.manager) return;
     this.manager.setWorld(id);
+    if (id === 'stage') this.manager.setStageFingerprint(this.fingerprint);
     this.refreshChips();
+    this.refreshSplitLabels();
   }
 
   private refreshChips(): void {
@@ -569,7 +576,7 @@ export class App {
     const ok = this.source === 'file';
     this.el.compareControls.classList.toggle('disabled', !ok);
     this.el.compareHint.textContent = ok
-      ? 'Load a second track to split the canvas.'
+      ? 'Load a second track to split the canvas. (Stage uses Track A when Split is on.)'
       : 'Compare needs a file on Track A (not mic/demo).';
     if (!ok) {
       this.el.optSplit.disabled = true;
@@ -580,9 +587,14 @@ export class App {
 
   private refreshSplitLabels(): void {
     const splitActive = this.splitOn && this.compare.loaded;
+    const stageMode = this.manager?.currentWorld === 'stage';
+    // Stage keeps full-bleed (Track A dance only) — still show overlay chrome + hint
     this.el.splitOverlay.classList.toggle('hidden', !splitActive);
+    this.el.splitOverlay.classList.toggle('stage-mode', splitActive && !!stageMode);
     this.el.splitLabelA.textContent = `A · ${this.trackLabel || 'Track A'}`;
-    this.el.splitLabelB.textContent = `B · ${this.compare.label || 'Track B'}`;
+    this.el.splitLabelB.textContent = stageMode
+      ? 'Stage uses Track A'
+      : `B · ${this.compare.label || 'Track B'}`;
   }
 
   private applyHearMode(): void {
@@ -710,6 +722,9 @@ export class App {
       energy: fp.energy,
       brightness: fp.brightness,
       speed: style.speed,
+      bpm: this.tapBpm ?? fp.bpm,
+      bassRatio: fp.bassRatio,
+      genreHint: fp.genreHint,
       colorA: colors.colorA,
       colorB: colors.colorB,
       colorC: colors.colorC,
@@ -932,8 +947,9 @@ export class App {
     const paramsA = this.buildParams(time, dt, live, beat, this.style, this.fingerprint);
 
     const splitActive = this.splitOn && this.compare.loaded && !!this.manager;
+    const stageSplit = splitActive && this.manager!.currentWorld === 'stage';
 
-    if (splitActive) {
+    if (splitActive && !stageSplit) {
       const frameB = this.compare.getFrame(dt);
       const liveB = this.dynamicsB.update(
         frameB.bass,
@@ -961,6 +977,7 @@ export class App {
       );
       this.manager!.renderSplit(paramsA, frame.spectrum, paramsB, frameB.spectrum);
     } else if (this.manager) {
+      // Stage + split: full-bleed dancer driven by Track A only (Hear A/B/Mix still works)
       this.manager.render(paramsA, frame.spectrum);
     } else {
       this.fallback?.render(paramsA, frame.spectrum);

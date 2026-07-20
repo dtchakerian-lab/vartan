@@ -516,6 +516,15 @@ body {
   right: 14px;
 }
 
+/* Stage + compare: full-bleed dancer (Track A); hide fake divider */
+#split-overlay.stage-mode .split-divider {
+  display: none;
+}
+
+#split-overlay.stage-mode .split-label.right {
+  color: var(--accent2);
+}
+
 /* ---------- Options drawer ---------- */
 #drawer-backdrop {
   position: fixed;
